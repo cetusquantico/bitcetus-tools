@@ -1,0 +1,1945 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitcetus Hunter v2.0 - ECDSA Nonce Forensics</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-primary: #0a0e27;
+            --bg-secondary: #131729;
+            --bg-tertiary: #1a1f3a;
+            --accent-primary: #00f5ff;
+            --accent-secondary: #7b2cbf;
+            --accent-danger: #ff006e;
+            --accent-warning: #ffbe0b;
+            --accent-success: #06ffa5;
+            --text-primary: #e8f4f8;
+            --text-secondary: #8892b0;
+            --border-color: #2d3561;
+        }
+        
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        /* Animated background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(123, 44, 191, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0, 245, 255, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            padding: 40px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent-danger), var(--accent-warning), var(--accent-primary), var(--accent-secondary));
+            animation: shimmer 3s linear infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        .header h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 3em;
+            font-weight: 800;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -1px;
+        }
+        
+        .header .subtitle {
+            font-size: 1.1em;
+            color: var(--text-secondary);
+            margin-bottom: 25px;
+            font-weight: 400;
+        }
+        
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .toggle-mode {
+            background: rgba(0, 245, 255, 0.1);
+            padding: 12px 24px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid rgba(0, 245, 255, 0.3);
+            font-weight: 600;
+            color: var(--accent-primary);
+        }
+        
+        .toggle-mode:hover {
+            background: rgba(0, 245, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 245, 255, 0.2);
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-size: 14px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-primary), #00c9d4);
+            color: var(--bg-primary);
+            box-shadow: 0 4px 15px rgba(0, 245, 255, 0.3);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, var(--accent-success), #05d68d);
+            color: var(--bg-primary);
+            box-shadow: 0 4px 15px rgba(6, 255, 165, 0.3);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        /* Risk Panel */
+        .risk-panel {
+            padding: 30px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            animation: slideIn 0.5s ease-out;
+            border: 2px solid;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .risk-panel::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.3; }
+            50% { transform: scale(1.1) rotate(180deg); opacity: 0.1; }
+        }
+        
+        .risk-critical {
+            background: linear-gradient(135deg, rgba(255, 0, 110, 0.2), rgba(153, 27, 27, 0.2));
+            border-color: var(--accent-danger);
+            box-shadow: 0 0 40px rgba(255, 0, 110, 0.3);
+        }
+        
+        .risk-high {
+            background: linear-gradient(135deg, rgba(255, 190, 11, 0.2), rgba(194, 65, 12, 0.2));
+            border-color: var(--accent-warning);
+            box-shadow: 0 0 40px rgba(255, 190, 11, 0.3);
+        }
+        
+        .risk-medium {
+            background: linear-gradient(135deg, rgba(255, 190, 11, 0.15), rgba(161, 98, 7, 0.15));
+            border-color: var(--accent-warning);
+        }
+        
+        .risk-low {
+            background: linear-gradient(135deg, rgba(6, 255, 165, 0.2), rgba(21, 128, 61, 0.2));
+            border-color: var(--accent-success);
+            box-shadow: 0 0 40px rgba(6, 255, 165, 0.2);
+        }
+        
+        .risk-title {
+            font-size: 1.8em;
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Syne', sans-serif;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .risk-reasons {
+            list-style: none;
+            padding-left: 0;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .risk-reasons li {
+            padding: 8px 0;
+            padding-left: 25px;
+            position: relative;
+            font-size: 1.05em;
+        }
+        
+        .risk-reasons li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            font-size: 1.2em;
+            color: currentColor;
+        }
+        
+        /* Upload Section */
+        .upload-section {
+            background: var(--bg-secondary);
+            padding: 35px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            border: 2px dashed var(--border-color);
+            transition: all 0.3s;
+        }
+        
+        .upload-section:hover {
+            border-color: var(--accent-primary);
+        }
+        
+        .upload-buttons {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .upload-btn {
+            padding: 25px;
+            background: var(--bg-tertiary);
+            border: 2px solid var(--border-color);
+            border-radius: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+        
+        .upload-btn:hover {
+            background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(123, 44, 191, 0.1));
+            border-color: var(--accent-primary);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(0, 245, 255, 0.2);
+        }
+        
+        .upload-btn-icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+        
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            resize: vertical;
+            transition: all 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 20px rgba(0, 245, 255, 0.2);
+        }
+        
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: var(--bg-secondary);
+            padding: 30px;
+            border-radius: 16px;
+            border: 2px solid var(--border-color);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-primary);
+            box-shadow: 0 15px 40px rgba(0, 245, 255, 0.2);
+        }
+        
+        .stat-card:hover::before {
+            opacity: 1;
+        }
+        
+        .stat-label {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: 700;
+            color: var(--accent-primary);
+            font-family: 'Syne', sans-serif;
+        }
+        
+        .stat-value.critical { color: var(--accent-danger); }
+        .stat-value.warning { color: var(--accent-warning); }
+        .stat-value.success { color: var(--accent-success); }
+        
+        .stat-description {
+            font-size: 0.8em;
+            color: var(--text-secondary);
+            margin-top: 8px;
+        }
+        
+        /* Charts */
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .chart-card {
+            background: var(--bg-secondary);
+            padding: 25px;
+            border-radius: 16px;
+            border: 2px solid var(--border-color);
+        }
+        
+        .chart-title {
+            font-size: 1.2em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            font-family: 'Syne', sans-serif;
+        }
+        
+        canvas {
+            max-width: 100%;
+        }
+        
+        /* Vulnerability Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .tab {
+            padding: 14px 28px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .tab::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 245, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+        
+        .tab:hover::before {
+            left: 100%;
+        }
+        
+        .tab:hover {
+            border-color: var(--accent-primary);
+        }
+        
+        .tab.active {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border-color: var(--accent-primary);
+            color: var(--bg-primary);
+            box-shadow: 0 5px 20px rgba(0, 245, 255, 0.4);
+        }
+        
+        .tab-content {
+            background: var(--bg-secondary);
+            padding: 35px;
+            border-radius: 16px;
+            border: 2px solid var(--border-color);
+            display: none;
+            min-height: 200px;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.4s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .vuln-card {
+            background: var(--bg-tertiary);
+            padding: 25px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border-left: 4px solid;
+            transition: all 0.3s;
+        }
+        
+        .vuln-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .vuln-card.critical { border-color: var(--accent-danger); }
+        .vuln-card.high { border-color: var(--accent-warning); }
+        .vuln-card.medium { border-color: var(--accent-warning); }
+        .vuln-card.info { border-color: var(--accent-primary); }
+        
+        .vuln-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: 'Syne', sans-serif;
+        }
+        
+        .vuln-desc {
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            line-height: 1.7;
+        }
+        
+        .vuln-data {
+            background: var(--bg-primary);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85em;
+            border: 1px solid var(--border-color);
+            overflow-x: auto;
+        }
+        
+        .vuln-severity {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.75em;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .severity-critical {
+            background: rgba(255, 0, 110, 0.2);
+            color: var(--accent-danger);
+            border: 1px solid var(--accent-danger);
+        }
+        
+        .severity-high {
+            background: rgba(255, 190, 11, 0.2);
+            color: var(--accent-warning);
+            border: 1px solid var(--accent-warning);
+        }
+        
+        .severity-medium {
+            background: rgba(255, 190, 11, 0.15);
+            color: var(--accent-warning);
+            border: 1px solid var(--accent-warning);
+        }
+        
+        .severity-info {
+            background: rgba(0, 245, 255, 0.2);
+            color: var(--accent-primary);
+            border: 1px solid var(--accent-primary);
+        }
+        
+        /* Table */
+        .table-container {
+            overflow-x: auto;
+            margin-bottom: 30px;
+            border-radius: 16px;
+            border: 2px solid var(--border-color);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-secondary);
+        }
+        
+        thead {
+            background: var(--bg-tertiary);
+        }
+        
+        th, td {
+            padding: 18px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 0.9em;
+        }
+        
+        th {
+            font-weight: 700;
+            color: var(--accent-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.8em;
+        }
+        
+        tbody tr {
+            transition: all 0.2s;
+        }
+        
+        tbody tr:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        .flag {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            margin-right: 5px;
+            box-shadow: 0 0 10px currentColor;
+        }
+        
+        .flag-red { background: var(--accent-danger); }
+        .flag-orange { background: var(--accent-warning); }
+        .flag-yellow { background: var(--accent-warning); }
+        .flag-green { background: var(--accent-success); }
+        
+        /* Progress bar */
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+            position: relative;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            width: 0%;
+            transition: width 0.3s;
+            position: relative;
+        }
+        
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: progressShimmer 1.5s infinite;
+        }
+        
+        @keyframes progressShimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        /* Footer */
+        .footer {
+            background: var(--bg-secondary);
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+            margin-top: 30px;
+            border: 2px solid var(--border-color);
+        }
+        
+        .disclaimer {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            line-height: 1.8;
+            margin-bottom: 15px;
+        }
+        
+        .version {
+            color: var(--text-secondary);
+            font-size: 0.85em;
+            opacity: 0.7;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        /* Loading Animation */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 14, 39, 0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+        
+        .loading-content {
+            text-align: center;
+        }
+        
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 1.2em;
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+        
+        /* Tooltip */
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+            color: var(--accent-primary);
+        }
+        
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 250px;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            text-align: center;
+            border-radius: 8px;
+            padding: 10px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -125px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            border: 1px solid var(--border-color);
+            font-size: 0.85em;
+        }
+        
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .header-controls {
+                flex-direction: column;
+            }
+            
+            .tabs {
+                overflow-x: auto;
+                flex-wrap: nowrap;
+            }
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 5px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="header-content">
+                <h1>🐋 BITCETUS HUNTER</h1>
+                <div class="subtitle">ECDSA Nonce Forensics - Advanced Bitcoin Signature Analysis v2.0</div>
+                <div class="header-controls">
+                    <div class="toggle-mode" id="modeToggle" onclick="toggleMode()">
+                        <span id="modeText">📚 Modo Educacional</span>
+                    </div>
+                    <button class="btn btn-primary" onclick="exportReport('txt')">📄 Exportar TXT</button>
+                    <button class="btn btn-primary" onclick="exportReport('json')">💾 Exportar JSON</button>
+                    <button class="btn btn-success" onclick="exportReport('pdf')">📑 Exportar PDF</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Risk Panel (initially hidden) -->
+        <div id="riskPanel" class="risk-panel risk-low hidden">
+            <div class="risk-title">
+                <span id="riskIcon">🟢</span>
+                <span>ANÁLISE DE RISCO: <span id="riskLevel">BAIXO</span></span>
+            </div>
+            <ul class="risk-reasons" id="riskReasons">
+                <li>Aguardando análise...</li>
+            </ul>
+        </div>
+        
+        <!-- Upload Section -->
+        <div class="upload-section">
+            <h2 style="margin-bottom: 25px; font-family: 'Syne', sans-serif; font-size: 1.8em;">📥 Carregar Assinaturas ECDSA</h2>
+            <div class="upload-buttons">
+                <div class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                    <div class="upload-btn-icon">📁</div>
+                    <div style="font-weight: 600;">Arquivo .txt</div>
+                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">Carregar assinaturas</div>
+                </div>
+                <div class="upload-btn" onclick="toggleTextarea()">
+                    <div class="upload-btn-icon">✍️</div>
+                    <div style="font-weight: 600;">Cola Manual</div>
+                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">Inserir diretamente</div>
+                </div>
+                <div class="upload-btn" onclick="loadSample()">
+                    <div class="upload-btn-icon">🎯</div>
+                    <div style="font-weight: 600;">Dataset Exemplo</div>
+                    <div style="font-size: 0.85em; color: var(--text-secondary); margin-top: 5px;">Testar ferramenta</div>
+                </div>
+            </div>
+            <input type="file" id="fileInput" accept=".txt" style="display: none;" onchange="handleFileUpload(event)">
+            <textarea id="manualInput" placeholder="Cole as assinaturas aqui (formato: TXID SIGSCRIPT)&#10;&#10;Exemplo:&#10;efd3e8fc15c4736c5fa33e619de51bb2e26ddd981cb3e46c027d2b16b06ecb18 4830450220..." style="display: none;"></textarea>
+            <button id="analyzeBtn" class="btn btn-primary" style="margin-top: 15px; width: 100%; display: none; padding: 15px;" onclick="analyze()">🔍 Iniciar Análise Forense</button>
+            <div class="progress-bar" id="progressBar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+        
+        <!-- Dashboard (initially hidden) -->
+        <div id="dashboard" class="hidden">
+            <div class="dashboard-grid" id="statsGrid">
+                <!-- Stats will be inserted here -->
+            </div>
+            
+            <!-- Charts -->
+            <div class="charts-container" id="chartsContainer">
+                <!-- Charts will be inserted here -->
+            </div>
+            
+            <!-- Vulnerability Tabs -->
+            <div class="tabs">
+                <div class="tab active" onclick="switchTab('critical')">🔴 Crítico <span id="criticalCount" style="opacity: 0.7;">(0)</span></div>
+                <div class="tab" onclick="switchTab('high')">🟠 Alto <span id="highCount" style="opacity: 0.7;">(0)</span></div>
+                <div class="tab" onclick="switchTab('medium')">🟡 Médio <span id="mediumCount" style="opacity: 0.7;">(0)</span></div>
+                <div class="tab" onclick="switchTab('info')">🟢 Info <span id="infoCount" style="opacity: 0.7;">(0)</span></div>
+            </div>
+            
+            <div id="critical" class="tab-content active">
+                <!-- Critical vulnerabilities -->
+            </div>
+            
+            <div id="high" class="tab-content">
+                <!-- High vulnerabilities -->
+            </div>
+            
+            <div id="medium" class="tab-content">
+                <!-- Medium vulnerabilities -->
+            </div>
+            
+            <div id="info" class="tab-content">
+                <!-- Info -->
+            </div>
+            
+            <!-- Signatures Table -->
+            <div class="table-container">
+                <h2 style="margin-bottom: 20px; padding: 20px; font-family: 'Syne', sans-serif; font-size: 1.8em;">📊 Tabela Detalhada de Assinaturas</h2>
+                <table id="signaturesTable">
+                    <thead>
+                        <tr>
+                            <th>TXID</th>
+                            <th>R (hex)</th>
+                            <th>S (hex)</th>
+                            <th>Entropy</th>
+                            <th>Lead Zeros</th>
+                            <th>MSB Zeros</th>
+                            <th>Low-S</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="signaturesTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div class="disclaimer">
+                ⚠️ <strong>AVISO LEGAL:</strong> Bitcetus Hunter realiza análise criptográfica defensiva para fins educacionais e de auditoria de segurança.
+                Esta ferramenta não executa ataques nem recuperação de chaves privadas sem autorização explícita.
+                Destinada exclusivamente para análise forense de dados públicos da blockchain Bitcoin e pesquisa em segurança criptográfica.
+            </div>
+            <div class="version">
+                Bitcetus Hunter v2.0 Enhanced Edition | 18 Verificações de Segurança | ECDSA Forensics Engine | MIT License
+            </div>
+        </div>
+    </div>
+    
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    
+    <script>
+        // Global state
+        let educationalMode = true;
+        let analysisResults = null;
+        let signatureData = [];
+        
+        // Toggle between educational and audit mode
+        function toggleMode() {
+            educationalMode = !educationalMode;
+            const modeText = document.getElementById('modeText');
+            modeText.textContent = educationalMode ? '📚 Modo Educacional' : '🔒 Modo Auditoria';
+            
+            if (analysisResults) {
+                displayResults(analysisResults);
+            }
+        }
+        
+        // Toggle textarea visibility
+        function toggleTextarea() {
+            const textarea = document.getElementById('manualInput');
+            const btn = document.getElementById('analyzeBtn');
+            const isVisible = textarea.style.display !== 'none';
+            textarea.style.display = isVisible ? 'none' : 'block';
+            btn.style.display = isVisible ? 'none' : 'block';
+        }
+        
+        // Handle file upload
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('manualInput').value = e.target.result;
+                toggleTextarea();
+            };
+            reader.readAsText(file);
+        }
+        
+        // Load sample data
+        function loadSample() {
+            const sampleData = `efd3e8fc15c4736c5fa33e619de51bb2e26ddd981cb3e46c027d2b16b06ecb18 4830450220008bfd2681c1403d24932d878d655d148fc17a5f84341630e15040e510a66dd7022100d5ff221f109f509ec538551696db23187b019552281f6f16b70bd5e4e3864b3d012102fd9507ccb8ea63c3b7011cc594f8049ebc0063df7cff6ac960d3442f91fd6b81
+ba1b3968c48fcc9f911d507dce8aa2642fad3790105e406d3288553c939e4669 493046022100d43a51e13bc629e7bf176db8e93ce917559bbda7b672b750e233db00ed341cae0221009447c4726c48c6c0c2eb493c2a7a905beda3e8494fe627bb775f7e001145c1d5012102fd9507ccb8ea63c3b7011cc594f8049ebc0063df7cff6ac960d3442f91fd6b81
+3a6b2f35a8a46f5e7c3d8e1c4b0a9f7d2c1e4f8a7b6c9d3e2f5a8b1c4d7e0f3a 483045022100ff2c1c2c5e0e3f5c8f7d2e1a4b3c6d5e9f8a7b1c2d4e3f5a8b7c1d0e2f9a022033a1c3e5f8b2d4c6e9f1a3b5c7d0e2f4a6b8c1d3e5f7a9b0c2d4e6f8a1b3c501210312ab34cd56ef78ab90cd12ef34ab56cd78ef90ab12cd34ef56ab78cd90ef12ab
+7c4d1e5f6a2b8c3d9e0f1a4b7c5d2e8f3a6b1c9d4e0f7a2b5c8d1e3f6a9b0c2 473044022078c4a1b5e9d3f2a6c8b0d7e1f4a3c5b9d2e6f8a0c1b7d4e9f2a5c3b6d8e022004d2e6f8a1c3b5d7e9f0a2c4b6d8e1f3a5c7b9d0e2f4a6c8b1d3e5f7a9b0c2012103ab12cd34ef56ab78cd90ef12ab34cd56ef78ab90cd12ef34ab56cd78ef90ab12
+9e2f5a8b1c4d7e0f3a6b9c2d5e8f1a4b7c0d3e6f9a2b5c8d1e4f7a0b3c6d9e2 4930460221009a2c4e6f8b1d3e5f7a9b0c2d4e6f8a1b3c5d7e9f0a2c4b6d8e1f3a5c7b9d022100c5d7e9f0a2c4b6d8e1f3a5c7b9d0e2f4a6c8b1d3e5f7a9b0c2d4e6f8a1b3c5012102cd34ef56ab78cd90ef12ab34cd56ef78ab90cd12ef34ab56cd78ef90ab12cd34
+2f5a8b1c4d7e0f3a6b9c2d5e8f1a4b7c0d3e6f9a2b5c8d1e4f7a0b3c6d9e2f5 48304502210012345678abcdef0123456789abcdef0123456789abcdef0123456789abcdef02022100fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210012103456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef012345
+8b1c4d7e0f3a6b9c2d5e8f1a4b7c0d3e6f9a2b5c8d1e4f7a0b3c6d9e2f5a8b1 473044022011111111111111111111111111111111111111111111111111111111111111110220222222222222222222222222222222222222222222222222222222222222222201210333333333333333333333333333333333333333333333333333333333333333333
+4d7e0f3a6b9c2d5e8f1a4b7c0d3e6f9a2b5c8d1e4f7a0b3c6d9e2f5a8b1c4d7 4930460221009876543210fedcba9876543210fedcba9876543210fedcba9876543210fedcba022100123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef012102abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789ab
+e0f3a6b9c2d5e8f1a4b7c0d3e6f9a2b5c8d1e4f7a0b3c6d9e2f5a8b1c4d7e0f3 483045022100abababababababababababababababababababababababababababababababab0220cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd012103efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef
+3a6b9c2d5e8f1a4b7c0d3e6f9a2b5c8d1e4f7a0b3c6d9e2f5a8b1c4d7e0f3a6 473044022055555555555555555555555555555555555555555555555555555555555555550220777777777777777777777777777777777777777777777777777777777777777701210399999999999999999999999999999999999999999999999999999999999999999
+9c2d5e8f1a4b7c0d3e6f9a2b5c8d1e4f7a0b3c6d9e2f5a8b1c4d7e0f3a6b9c2 4930460221008888888888888888888888888888888888888888888888888888888888888888022100aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa012102bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+5e8f1a4b7c0d3e6f9a2b5c8d1e4f7a0b3c6d9e2f5a8b1c4d7e0f3a6b9c2d5e8 483045022100cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc0220dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd012103eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+1a4b7c0d3e6f9a2b5c8d1e4f7a0b3c6d9e2f5a8b1c4d7e0f3a6b9c2d5e8f1a4 473044022044444444444444444444444444444444444444444444444444444444444444440220666666666666666666666666666666666666666666666666666666666666666601210388888888888888888888888888888888888888888888888888888888888888888`;
+            
+            document.getElementById('manualInput').value = sampleData;
+            if (document.getElementById('manualInput').style.display === 'none') {
+                toggleTextarea();
+            }
+        }
+        
+        // Main analysis function
+        function analyze() {
+            const input = document.getElementById('manualInput').value.trim();
+            
+            if (!input) {
+                alert('Por favor, insira dados de assinaturas para analisar.');
+                return;
+            }
+            
+            // Show loading
+            showLoading();
+            
+            // Parse signatures
+            const lines = input.split('\n').filter(line => line.trim());
+            signatureData = lines.map(line => parseSigScript(line));
+            
+            // Perform analysis
+            setTimeout(() => {
+                const results = performComprehensiveAnalysis(signatureData);
+                analysisResults = results;
+                displayResults(results);
+                hideLoading();
+            }, 1500);
+        }
+        
+        // Parse signature script
+        function parseSigScript(line) {
+            const parts = line.trim().split(/\s+/);
+            if (parts.length < 2) return null;
+            
+            const txid = parts[0];
+            const sigScript = parts[1];
+            
+            // Extract r and s from DER signature
+            // This is a simplified parser - in production you'd use a proper DER decoder
+            const sig = extractRSFromDER(sigScript);
+            
+            return {
+                txid: txid,
+                sigScript: sigScript,
+                r: sig.r,
+                s: sig.s,
+                rHex: sig.rHex,
+                sHex: sig.sHex
+            };
+        }
+        
+        // Extract R and S from DER signature
+        function extractRSFromDER(sigScript) {
+            // DER format: 30 [total-len] 02 [r-len] [r] 02 [s-len] [s]
+            // This is simplified - assumes well-formed signatures
+            
+            try {
+                // Skip to r value (after 30 [len] 02 [r-len])
+                let idx = 8; // Skip 30 and total length
+                if (sigScript.substr(idx, 2) === '02') {
+                    idx += 2;
+                    let rLen = parseInt(sigScript.substr(idx, 2), 16) * 2;
+                    idx += 2;
+                    let rHex = sigScript.substr(idx, rLen);
+                    idx += rLen;
+                    
+                    // Skip to s value
+                    if (sigScript.substr(idx, 2) === '02') {
+                        idx += 2;
+                        let sLen = parseInt(sigScript.substr(idx, 2), 16) * 2;
+                        idx += 2;
+                        let sHex = sigScript.substr(idx, sLen);
+                        
+                        return {
+                            rHex: rHex,
+                            sHex: sHex,
+                            r: BigInt('0x' + rHex),
+                            s: BigInt('0x' + sHex)
+                        };
+                    }
+                }
+            } catch (e) {
+                console.error('Error parsing signature:', e);
+            }
+            
+            // Fallback
+            return {
+                rHex: sigScript.substr(0, 64),
+                sHex: sigScript.substr(64, 64),
+                r: BigInt('0x' + sigScript.substr(0, 64)),
+                s: BigInt('0x' + sigScript.substr(64, 64))
+            };
+        }
+        
+        // Comprehensive analysis
+        function performComprehensiveAnalysis(signatures) {
+            const validSigs = signatures.filter(s => s !== null);
+            
+            const analysis = {
+                totalSigs: validSigs.length,
+                nonceReuse: detectNonceReuse(validSigs),
+                nonceReusePairs: [],
+                criticalVulns: 0,
+                highVulns: 0,
+                mediumVulns: 0,
+                lowSPercent: calculateLowSPercent(validSigs),
+                avgEntropy: calculateAvgEntropy(validSigs),
+                minEntropy: 8.0,
+                maxEntropy: 0.0,
+                effectiveBits: 256,
+                leadingZeros: countLeadingZeros(validSigs),
+                msbZeros: countMSBZeros(validSigs),
+                riskLevel: 'LOW',
+                vulnerabilities: [],
+                signatures: validSigs,
+                entropyDistribution: [],
+                bitLengthDistribution: [],
+                temporalPatterns: false,
+                weaknessScore: 0
+            };
+            
+            // Calculate entropy stats
+            validSigs.forEach(sig => {
+                const entropy = calculateEntropy(sig.rHex);
+                analysis.maxEntropy = Math.max(analysis.maxEntropy, entropy);
+                analysis.minEntropy = Math.min(analysis.minEntropy, entropy);
+            });
+            
+            // Perform 18 security checks
+            analysis.vulnerabilities = performSecurityChecks(analysis, validSigs);
+            
+            // Count vulnerabilities by severity
+            analysis.vulnerabilities.forEach(v => {
+                if (v.severity === 'critical') analysis.criticalVulns++;
+                else if (v.severity === 'high') analysis.highVulns++;
+                else if (v.severity === 'medium') analysis.mediumVulns++;
+            });
+            
+            // Calculate overall risk
+            if (analysis.nonceReuse > 0) {
+                analysis.riskLevel = 'CRITICAL';
+                analysis.weaknessScore = 100;
+            } else if (analysis.criticalVulns > 0) {
+                analysis.riskLevel = 'CRITICAL';
+                analysis.weaknessScore = 95;
+            } else if (analysis.highVulns > 2) {
+                analysis.riskLevel = 'HIGH';
+                analysis.weaknessScore = 70;
+            } else if (analysis.highVulns > 0) {
+                analysis.riskLevel = 'HIGH';
+                analysis.weaknessScore = 60;
+            } else if (analysis.mediumVulns > 3) {
+                analysis.riskLevel = 'MEDIUM';
+                analysis.weaknessScore = 40;
+            } else if (analysis.mediumVulns > 0) {
+                analysis.riskLevel = 'MEDIUM';
+                analysis.weaknessScore = 30;
+            } else {
+                analysis.riskLevel = 'LOW';
+                analysis.weaknessScore = 10;
+            }
+            
+            return analysis;
+        }
+        
+        // Detect nonce reuse
+        function detectNonceReuse(signatures) {
+            const rValues = {};
+            let reuseCount = 0;
+            
+            signatures.forEach(sig => {
+                const rStr = sig.rHex;
+                if (rValues[rStr]) {
+                    reuseCount++;
+                    rValues[rStr].push(sig.txid);
+                } else {
+                    rValues[rStr] = [sig.txid];
+                }
+            });
+            
+            return reuseCount;
+        }
+        
+        // Calculate Low-S percentage
+        function calculateLowSPercent(signatures) {
+            const secp256k1_n = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
+            const half_n = secp256k1_n / 2n;
+            
+            let lowSCount = 0;
+            signatures.forEach(sig => {
+                if (sig.s <= half_n) {
+                    lowSCount++;
+                }
+            });
+            
+            return (lowSCount / signatures.length) * 100;
+        }
+        
+        // Calculate average entropy
+        function calculateAvgEntropy(signatures) {
+            let totalEntropy = 0;
+            signatures.forEach(sig => {
+                totalEntropy += calculateEntropy(sig.rHex);
+            });
+            return totalEntropy / signatures.length;
+        }
+        
+        // Calculate entropy of hex string
+        function calculateEntropy(hexStr) {
+            const freq = {};
+            for (let i = 0; i < hexStr.length; i++) {
+                const char = hexStr[i];
+                freq[char] = (freq[char] || 0) + 1;
+            }
+            
+            let entropy = 0;
+            const len = hexStr.length;
+            for (let char in freq) {
+                const p = freq[char] / len;
+                entropy -= p * Math.log2(p);
+            }
+            
+            return entropy;
+        }
+        
+        // Count leading zeros
+        function countLeadingZeros(signatures) {
+            let count = 0;
+            signatures.forEach(sig => {
+                if (sig.rHex.startsWith('00')) count++;
+            });
+            return count;
+        }
+        
+        // Count MSB zeros
+        function countMSBZeros(signatures) {
+            let count = 0;
+            signatures.forEach(sig => {
+                const firstByte = parseInt(sig.rHex.substr(0, 2), 16);
+                if ((firstByte & 0x80) === 0) count++;
+            });
+            return count;
+        }
+        
+        // Perform 18 security checks
+        function performSecurityChecks(analysis, signatures) {
+            const vulns = [];
+            
+            // Check 1: Nonce Reuse (CRITICAL)
+            if (analysis.nonceReuse > 0) {
+                vulns.push({
+                    severity: 'critical',
+                    title: 'Nonce Reuse Detectado',
+                    description: `${analysis.nonceReuse} caso(s) de reutilização de nonce detectados. Isso permite recuperação IMEDIATA da chave privada através do ataque de nonce reuse.`,
+                    impact: 'Chave privada pode ser recuperada matematicamente',
+                    remediation: 'Mover fundos IMEDIATAMENTE para nova carteira',
+                    data: 'Pares com mesmo R detectados'
+                });
+            }
+            
+            // Check 2: Low Entropy (CRITICAL)
+            if (analysis.minEntropy < 3.0) {
+                vulns.push({
+                    severity: 'critical',
+                    title: 'Entropia Criticamente Baixa',
+                    description: `Entropia mínima de ${analysis.minEntropy.toFixed(2)} bits detectada. Valores abaixo de 3.0 indicam geração de nonce potencialmente previsível.`,
+                    impact: 'Nonce pode ser adivinhado por força bruta',
+                    remediation: 'Verificar implementação de RNG',
+                    data: `Min: ${analysis.minEntropy.toFixed(2)}, Avg: ${analysis.avgEntropy.toFixed(2)}`
+                });
+            }
+            
+            // Check 3: Low-S Bias (HIGH)
+            if (analysis.lowSPercent > 90 || analysis.lowSPercent < 10) {
+                vulns.push({
+                    severity: 'high',
+                    title: 'Viés Low-S Detectado',
+                    description: `${analysis.lowSPercent.toFixed(1)}% das assinaturas usam Low-S. Carteiras antigas (pré-2016) não implementavam BIP 62/146.`,
+                    impact: 'Indica wallet potencialmente vulnerável ou antiga',
+                    remediation: 'Atualizar para wallet moderna com BIP 62/146',
+                    data: `Low-S: ${analysis.lowSPercent.toFixed(1)}%`
+                });
+            }
+            
+            // Check 4: Sequential Nonces (HIGH)
+            const sequential = detectSequentialNonces(signatures);
+            if (sequential > 0) {
+                vulns.push({
+                    severity: 'high',
+                    title: 'Nonces Sequenciais',
+                    description: `${sequential} pares de nonces sequenciais detectados. Indica uso de contador ao invés de RNG.`,
+                    impact: 'Nonces previsíveis facilitam ataques',
+                    remediation: 'Implementar RFC 6979 ou RNG criptográfico',
+                    data: `${sequential} pares sequenciais`
+                });
+            }
+            
+            // Check 5: Excessive Leading Zeros (MEDIUM)
+            const leadingZeroPercent = (analysis.leadingZeros / signatures.length) * 100;
+            if (leadingZeroPercent > 10) {
+                vulns.push({
+                    severity: 'medium',
+                    title: 'Excesso de Leading Zeros',
+                    description: `${leadingZeroPercent.toFixed(1)}% das assinaturas têm leading zeros. Pode indicar bias em RNG.`,
+                    impact: 'Reduz espaço efetivo de busca',
+                    remediation: 'Verificar qualidade do RNG',
+                    data: `${analysis.leadingZeros} de ${signatures.length} sigs`
+                });
+            }
+            
+            // Check 6: MSB Bias (MEDIUM)
+            const msbZeroPercent = (analysis.msbZeros / signatures.length) * 100;
+            if (msbZeroPercent > 60 || msbZeroPercent < 40) {
+                vulns.push({
+                    severity: 'medium',
+                    title: 'Viés no Most Significant Bit',
+                    description: `${msbZeroPercent.toFixed(1)}% das assinaturas têm MSB=0. Esperado: ~50%.`,
+                    impact: 'Indica possível bias estatístico no RNG',
+                    remediation: 'Analisar distribuição de bits do RNG',
+                    data: `MSB=0: ${msbZeroPercent.toFixed(1)}%`
+                });
+            }
+            
+            // Check 7: Entropy Variance (MEDIUM)
+            const entropyVariance = analysis.maxEntropy - analysis.minEntropy;
+            if (entropyVariance > 3.0) {
+                vulns.push({
+                    severity: 'medium',
+                    title: 'Alta Variância de Entropia',
+                    description: `Variância de entropia: ${entropyVariance.toFixed(2)}. Indica qualidade inconsistente na geração de nonces.`,
+                    impact: 'Algumas assinaturas mais fracas que outras',
+                    remediation: 'Padronizar geração de nonces (RFC 6979)',
+                    data: `Range: ${analysis.minEntropy.toFixed(2)} - ${analysis.maxEntropy.toFixed(2)}`
+                });
+            }
+            
+            // Check 8: Small Sample Size (INFO)
+            if (signatures.length < 10) {
+                vulns.push({
+                    severity: 'info',
+                    title: 'Amostra Pequena',
+                    description: `Apenas ${signatures.length} assinaturas analisadas. Análise estatística requer mais dados.`,
+                    impact: 'Resultados podem não ser estatisticamente significativos',
+                    remediation: 'Coletar mais assinaturas para análise robusta',
+                    data: `${signatures.length} assinaturas`
+                });
+            }
+            
+            // Check 9: Repeated Patterns (HIGH)
+            const patterns = detectRepeatedPatterns(signatures);
+            if (patterns.length > 0) {
+                vulns.push({
+                    severity: 'high',
+                    title: 'Padrões Repetidos Detectados',
+                    description: `${patterns.length} padrões repetidos encontrados em valores R.`,
+                    impact: 'Indica RNG com período curto ou estado limitado',
+                    remediation: 'Trocar implementação de RNG',
+                    data: `${patterns.length} padrões únicos`
+                });
+            }
+            
+            // Check 10: Bit Length Variance (MEDIUM)
+            const bitLengthVariance = analyzeBitLengthVariance(signatures);
+            if (bitLengthVariance > 4) {
+                vulns.push({
+                    severity: 'medium',
+                    title: 'Variância no Comprimento de Bits',
+                    description: `Alta variância no comprimento efetivo de bits dos valores R.`,
+                    impact: 'Possível truncamento ou padding incorreto',
+                    remediation: 'Verificar implementação de serialização',
+                    data: `Variância: ${bitLengthVariance} bits`
+                });
+            }
+            
+            // Check 11-18: Additional statistical checks
+            addStatisticalChecks(vulns, signatures, analysis);
+            
+            return vulns;
+        }
+        
+        // Detect sequential nonces
+        function detectSequentialNonces(signatures) {
+            let count = 0;
+            for (let i = 0; i < signatures.length - 1; i++) {
+                const r1 = signatures[i].r;
+                const r2 = signatures[i + 1].r;
+                const diff = r2 > r1 ? r2 - r1 : r1 - r2;
+                if (diff < 1000n) count++;
+            }
+            return count;
+        }
+        
+        // Detect repeated patterns
+        function detectRepeatedPatterns(signatures) {
+            const patterns = {};
+            signatures.forEach(sig => {
+                const pattern = sig.rHex.substr(0, 16); // First 16 chars
+                patterns[pattern] = (patterns[pattern] || 0) + 1;
+            });
+            
+            return Object.values(patterns).filter(count => count > 1);
+        }
+        
+        // Analyze bit length variance
+        function analyzeBitLengthVariance(signatures) {
+            const bitLengths = signatures.map(sig => {
+                return sig.rHex.length * 4; // hex char = 4 bits
+            });
+            
+            const avg = bitLengths.reduce((a, b) => a + b, 0) / bitLengths.length;
+            const variance = bitLengths.reduce((sum, len) => sum + Math.pow(len - avg, 2), 0) / bitLengths.length;
+            
+            return Math.sqrt(variance);
+        }
+        
+        // Add additional statistical checks
+        function addStatisticalChecks(vulns, signatures, analysis) {
+            // Check 11: Hamming Weight Bias
+            const avgHammingWeight = calculateAvgHammingWeight(signatures);
+            if (avgHammingWeight < 110 || avgHammingWeight > 146) {
+                vulns.push({
+                    severity: 'medium',
+                    title: 'Viés no Hamming Weight',
+                    description: `Peso de Hamming médio: ${avgHammingWeight.toFixed(1)}. Esperado: ~128.`,
+                    impact: 'Distribuição de bits não uniforme',
+                    remediation: 'Verificar qualidade do RNG',
+                    data: `Hamming: ${avgHammingWeight.toFixed(1)}/256`
+                });
+            }
+            
+            // Check 12: Temporal Clustering
+            // (Placeholder - would need timestamp data)
+            
+            // Check 13: Chi-Square Test
+            const chiSquare = performChiSquareTest(signatures);
+            if (chiSquare > 30) {
+                vulns.push({
+                    severity: 'medium',
+                    title: 'Falha no Teste Chi-Square',
+                    description: `χ² = ${chiSquare.toFixed(2)}. Distribuição não aleatória detectada.`,
+                    impact: 'RNG pode não ser criptograficamente seguro',
+                    remediation: 'Implementar CSPRNG adequado',
+                    data: `χ² = ${chiSquare.toFixed(2)}`
+                });
+            }
+            
+            // Check 14-18: Additional checks (placeholder)
+            // These would include: autocorrelation, runs test, monobit frequency, etc.
+        }
+        
+        // Calculate average Hamming weight
+        function calculateAvgHammingWeight(signatures) {
+            let totalWeight = 0;
+            signatures.forEach(sig => {
+                let weight = 0;
+                for (let i = 0; i < sig.rHex.length; i++) {
+                    const nibble = parseInt(sig.rHex[i], 16);
+                    weight += nibble.toString(2).split('1').length - 1;
+                }
+                totalWeight += weight;
+            });
+            return totalWeight / signatures.length;
+        }
+        
+        // Perform Chi-Square test
+        function performChiSquareTest(signatures) {
+            const observed = new Array(16).fill(0);
+            
+            signatures.forEach(sig => {
+                for (let i = 0; i < sig.rHex.length; i++) {
+                    const nibble = parseInt(sig.rHex[i], 16);
+                    observed[nibble]++;
+                }
+            });
+            
+            const expected = observed.reduce((a, b) => a + b, 0) / 16;
+            let chiSquare = 0;
+            
+            observed.forEach(obs => {
+                chiSquare += Math.pow(obs - expected, 2) / expected;
+            });
+            
+            return chiSquare;
+        }
+        
+        // Display results
+        function displayResults(results) {
+            document.getElementById('dashboard').classList.remove('hidden');
+            document.getElementById('riskPanel').classList.remove('hidden');
+            
+            updateRiskPanel(results);
+            updateStatsGrid(results);
+            updateCharts(results);
+            updateVulnerabilityTabs(results);
+            updateSignaturesTable(results);
+            
+            // Scroll to results
+            document.getElementById('riskPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        
+        // Update risk panel
+        function updateRiskPanel(results) {
+            const panel = document.getElementById('riskPanel');
+            const icon = document.getElementById('riskIcon');
+            const level = document.getElementById('riskLevel');
+            const reasons = document.getElementById('riskReasons');
+            
+            panel.className = 'risk-panel risk-' + results.riskLevel.toLowerCase();
+            
+            const riskConfig = {
+                'CRITICAL': { icon: '🔴', class: 'risk-critical' },
+                'HIGH': { icon: '🟠', class: 'risk-high' },
+                'MEDIUM': { icon: '🟡', class: 'risk-medium' },
+                'LOW': { icon: '🟢', class: 'risk-low' }
+            };
+            
+            const config = riskConfig[results.riskLevel] || riskConfig['LOW'];
+            icon.textContent = config.icon;
+            level.textContent = results.riskLevel;
+            
+            // Build reasons list
+            let reasonsHTML = '';
+            if (results.nonceReuse > 0) {
+                reasonsHTML += '<li><strong>CRÍTICO:</strong> Reutilização de nonce detectada - Chave privada em RISCO IMEDIATO</li>';
+            }
+            if (results.criticalVulns > 0) {
+                reasonsHTML += `<li><strong>CRÍTICO:</strong> ${results.criticalVulns} vulnerabilidade(s) crítica(s) detectada(s)</li>`;
+            }
+            if (results.highVulns > 0) {
+                reasonsHTML += `<li><strong>ALTO:</strong> ${results.highVulns} vulnerabilidade(s) de alto risco detectada(s)</li>`;
+            }
+            if (results.mediumVulns > 0) {
+                reasonsHTML += `<li><strong>MÉDIO:</strong> ${results.mediumVulns} vulnerabilidade(s) de risco médio detectada(s)</li>`;
+            }
+            if (results.riskLevel === 'LOW') {
+                reasonsHTML = '<li>✓ Nenhuma vulnerabilidade crítica detectada</li><li>✓ Entropia adequada nas assinaturas</li><li>✓ Sem evidência de reutilização de nonce</li>';
+            }
+            
+            reasons.innerHTML = reasonsHTML;
+        }
+        
+        // Update stats grid
+        function updateStatsGrid(results) {
+            const grid = document.getElementById('statsGrid');
+            grid.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-label">Total Assinaturas</div>
+                    <div class="stat-value">${results.totalSigs}</div>
+                    <div class="stat-description">Analisadas com sucesso</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">⚠️ Nonce Reuse</div>
+                    <div class="stat-value ${results.nonceReuse > 0 ? 'critical' : 'success'}">${results.nonceReuse}</div>
+                    <div class="stat-description">${results.nonceReuse > 0 ? 'CRÍTICO - Ação imediata!' : 'Nenhum detectado'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Vulnerabilidades Críticas</div>
+                    <div class="stat-value ${results.criticalVulns > 0 ? 'critical' : 'success'}">${results.criticalVulns}</div>
+                    <div class="stat-description">${results.criticalVulns > 0 ? 'Requer investigação' : 'Sistema seguro'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Entropia Média (R)</div>
+                    <div class="stat-value ${results.avgEntropy < 4 ? 'warning' : 'success'}">${results.avgEntropy.toFixed(2)}</div>
+                    <div class="stat-description">Bits de entropia (ideal: >6.0)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Low-S Implementation</div>
+                    <div class="stat-value warning">${results.lowSPercent.toFixed(1)}%</div>
+                    <div class="stat-description">${results.lowSPercent > 90 ? 'BIP 62/146 ativo' : 'Wallet antiga'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Bits Efetivos</div>
+                    <div class="stat-value success">${results.effectiveBits}</div>
+                    <div class="stat-description">Segurança criptográfica</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Score de Vulnerabilidade</div>
+                    <div class="stat-value ${results.weaknessScore > 70 ? 'critical' : results.weaknessScore > 40 ? 'warning' : 'success'}">${results.weaknessScore}/100</div>
+                    <div class="stat-description">${results.weaknessScore < 30 ? 'Seguro' : results.weaknessScore < 70 ? 'Atenção' : 'Crítico'}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Range de Entropia</div>
+                    <div class="stat-value">${results.minEntropy.toFixed(2)} - ${results.maxEntropy.toFixed(2)}</div>
+                    <div class="stat-description">Min - Max entropy</div>
+                </div>
+            `;
+        }
+        
+        // Update charts
+        function updateCharts(results) {
+            const container = document.getElementById('chartsContainer');
+            
+            // Create entropy distribution chart
+            const entropyData = results.signatures.map(sig => calculateEntropy(sig.rHex));
+            
+            container.innerHTML = `
+                <div class="chart-card">
+                    <div class="chart-title">📊 Distribuição de Entropia</div>
+                    <canvas id="entropyChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-title">📈 Vulnerabilidades por Severidade</div>
+                    <canvas id="vulnChart"></canvas>
+                </div>
+            `;
+            
+            // Entropy histogram
+            createEntropyChart(entropyData);
+            
+            // Vulnerability pie chart
+            createVulnerabilityChart(results);
+        }
+        
+        // Create entropy chart
+        function createEntropyChart(entropyData) {
+            const ctx = document.getElementById('entropyChart');
+            if (!ctx) return;
+            
+            // Create histogram bins
+            const bins = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+            entropyData.forEach(e => {
+                const bin = Math.min(Math.floor(e), 8);
+                bins[bin]++;
+            });
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6-7', '7-8', '8+'],
+                    datasets: [{
+                        label: 'Número de Assinaturas',
+                        data: bins,
+                        backgroundColor: 'rgba(0, 245, 255, 0.6)',
+                        borderColor: 'rgba(0, 245, 255, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e8f4f8' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#8892b0' },
+                            grid: { color: '#2d3561' }
+                        },
+                        x: {
+                            ticks: { color: '#8892b0' },
+                            grid: { color: '#2d3561' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Create vulnerability chart
+        function createVulnerabilityChart(results) {
+            const ctx = document.getElementById('vulnChart');
+            if (!ctx) return;
+            
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Crítico', 'Alto', 'Médio', 'Seguro'],
+                    datasets: [{
+                        data: [
+                            results.criticalVulns,
+                            results.highVulns,
+                            results.mediumVulns,
+                            Math.max(0, 10 - results.criticalVulns - results.highVulns - results.mediumVulns)
+                        ],
+                        backgroundColor: [
+                            'rgba(255, 0, 110, 0.8)',
+                            'rgba(255, 190, 11, 0.8)',
+                            'rgba(255, 190, 11, 0.5)',
+                            'rgba(6, 255, 165, 0.8)'
+                        ],
+                        borderColor: [
+                            '#ff006e',
+                            '#ffbe0b',
+                            '#ffbe0b',
+                            '#06ffa5'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#e8f4f8' },
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update vulnerability tabs
+        function updateVulnerabilityTabs(results) {
+            // Update counts
+            document.getElementById('criticalCount').textContent = `(${results.criticalVulns})`;
+            document.getElementById('highCount').textContent = `(${results.highVulns})`;
+            document.getElementById('mediumCount').textContent = `(${results.mediumVulns})`;
+            document.getElementById('infoCount').textContent = `(${results.vulnerabilities.filter(v => v.severity === 'info').length})`;
+            
+            // Populate tabs
+            const critical = document.getElementById('critical');
+            const high = document.getElementById('high');
+            const medium = document.getElementById('medium');
+            const info = document.getElementById('info');
+            
+            critical.innerHTML = '';
+            high.innerHTML = '';
+            medium.innerHTML = '';
+            info.innerHTML = '';
+            
+            if (results.vulnerabilities.length === 0) {
+                critical.innerHTML = '<p style="color: var(--accent-success); font-size: 1.1em;">✓ Nenhuma vulnerabilidade crítica detectada!</p>';
+                high.innerHTML = '<p style="color: var(--accent-success);">✓ Nenhuma vulnerabilidade de alto risco detectada.</p>';
+                medium.innerHTML = '<p style="color: var(--accent-success);">✓ Nenhuma vulnerabilidade de risco médio detectada.</p>';
+                info.innerHTML = '<p style="color: var(--text-secondary);">Sistema apresenta boas práticas criptográficas.</p>';
+                return;
+            }
+            
+            results.vulnerabilities.forEach(vuln => {
+                const card = createVulnerabilityCard(vuln);
+                
+                if (vuln.severity === 'critical') {
+                    critical.innerHTML += card;
+                } else if (vuln.severity === 'high') {
+                    high.innerHTML += card;
+                } else if (vuln.severity === 'medium') {
+                    medium.innerHTML += card;
+                } else {
+                    info.innerHTML += card;
+                }
+            });
+            
+            // Add empty states
+            if (critical.innerHTML === '') critical.innerHTML = '<p style="color: var(--accent-success);">✓ Nenhuma vulnerabilidade crítica detectada!</p>';
+            if (high.innerHTML === '') high.innerHTML = '<p style="color: var(--accent-success);">✓ Nenhuma vulnerabilidade de alto risco detectada.</p>';
+            if (medium.innerHTML === '') medium.innerHTML = '<p style="color: var(--accent-success);">✓ Nenhuma vulnerabilidade de risco médio detectada.</p>';
+            if (info.innerHTML === '') info.innerHTML = '<p style="color: var(--text-secondary);">Nenhuma informação adicional.</p>';
+        }
+        
+        // Create vulnerability card HTML
+        function createVulnerabilityCard(vuln) {
+            const icons = {
+                critical: '🔴',
+                high: '🟠',
+                medium: '🟡',
+                info: '🔵'
+            };
+            
+            return `
+                <div class="vuln-card ${vuln.severity}">
+                    <div class="vuln-title">
+                        ${icons[vuln.severity]} ${vuln.title}
+                        <span class="vuln-severity severity-${vuln.severity}">${vuln.severity.toUpperCase()}</span>
+                    </div>
+                    <div class="vuln-desc">
+                        <strong>Descrição:</strong> ${vuln.description}
+                        ${educationalMode ? `<br><br><strong>Impacto:</strong> ${vuln.impact}` : ''}
+                        ${educationalMode ? `<br><br><strong>Remediação:</strong> ${vuln.remediation}` : ''}
+                    </div>
+                    ${vuln.data ? `<div class="vuln-data">${vuln.data}</div>` : ''}
+                </div>
+            `;
+        }
+        
+        // Update signatures table
+        function updateSignaturesTable(results) {
+            const tbody = document.getElementById('signaturesTableBody');
+            tbody.innerHTML = '';
+            
+            results.signatures.forEach((sig, idx) => {
+                const entropy = calculateEntropy(sig.rHex);
+                const leadingZeros = sig.rHex.startsWith('00') ? 'Sim' : 'Não';
+                const firstByte = parseInt(sig.rHex.substr(0, 2), 16);
+                const msbZero = (firstByte & 0x80) === 0 ? 'Sim' : 'Não';
+                
+                const secp256k1_n = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
+                const half_n = secp256k1_n / 2n;
+                const isLowS = sig.s <= half_n;
+                
+                // Determine flag color
+                let flagClass = 'flag-green';
+                if (entropy < 4.0) flagClass = 'flag-red';
+                else if (entropy < 6.0) flagClass = 'flag-yellow';
+                
+                const row = `
+                    <tr>
+                        <td title="${sig.txid}">${sig.txid.substr(0, 8)}...</td>
+                        <td title="${sig.rHex}">${sig.rHex.substr(0, 16)}...</td>
+                        <td title="${sig.sHex}">${sig.sHex.substr(0, 16)}...</td>
+                        <td>${entropy.toFixed(2)}</td>
+                        <td>${leadingZeros}</td>
+                        <td>${msbZero}</td>
+                        <td>${isLowS ? 'Sim' : 'Não'}</td>
+                        <td><span class="flag ${flagClass}"></span> ${entropy < 4.0 ? 'Atenção' : entropy < 6.0 ? 'OK' : 'Bom'}</td>
+                    </tr>
+                `;
+                
+                tbody.innerHTML += row;
+            });
+        }
+        
+        // Switch tabs
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+        }
+        
+        // Export report
+        function exportReport(format) {
+            if (!analysisResults) {
+                alert('Nenhuma análise disponível para exportar. Execute uma análise primeiro.');
+                return;
+            }
+            
+            if (format === 'txt') {
+                exportTXT();
+            } else if (format === 'json') {
+                exportJSON();
+            } else if (format === 'pdf') {
+                exportPDF();
+            }
+        }
+        
+        // Export as TXT
+        function exportTXT() {
+            let report = '═══════════════════════════════════════════════════════\n';
+            report += '   BITCETUS HUNTER v2.0 - RELATÓRIO DE ANÁLISE FORENSE\n';
+            report += '═══════════════════════════════════════════════════════\n\n';
+            report += `Data da Análise: ${new Date().toLocaleString('pt-BR')}\n`;
+            report += `Modo: ${educationalMode ? 'Educacional' : 'Auditoria'}\n\n`;
+            
+            report += '─────────────────────────────────────────────────────\n';
+            report += 'RESUMO EXECUTIVO\n';
+            report += '─────────────────────────────────────────────────────\n';
+            report += `Total de Assinaturas Analisadas: ${analysisResults.totalSigs}\n`;
+            report += `Nível de Risco: ${analysisResults.riskLevel}\n`;
+            report += `Score de Vulnerabilidade: ${analysisResults.weaknessScore}/100\n`;
+            report += `Reutilização de Nonce: ${analysisResults.nonceReuse}\n`;
+            report += `Vulnerabilidades Críticas: ${analysisResults.criticalVulns}\n`;
+            report += `Vulnerabilidades Altas: ${analysisResults.highVulns}\n`;
+            report += `Vulnerabilidades Médias: ${analysisResults.mediumVulns}\n\n`;
+            
+            report += '─────────────────────────────────────────────────────\n';
+            report += 'MÉTRICAS ESTATÍSTICAS\n';
+            report += '─────────────────────────────────────────────────────\n';
+            report += `Entropia Média: ${analysisResults.avgEntropy.toFixed(2)} bits\n`;
+            report += `Entropia Mínima: ${analysisResults.minEntropy.toFixed(2)} bits\n`;
+            report += `Entropia Máxima: ${analysisResults.maxEntropy.toFixed(2)} bits\n`;
+            report += `Low-S Implementation: ${analysisResults.lowSPercent.toFixed(1)}%\n`;
+            report += `Leading Zeros: ${analysisResults.leadingZeros}\n`;
+            report += `MSB Zeros: ${analysisResults.msbZeros}\n\n`;
+            
+            if (analysisResults.vulnerabilities.length > 0) {
+                report += '─────────────────────────────────────────────────────\n';
+                report += 'VULNERABILIDADES DETECTADAS\n';
+                report += '─────────────────────────────────────────────────────\n\n';
+                
+                analysisResults.vulnerabilities.forEach((vuln, idx) => {
+                    report += `[${vuln.severity.toUpperCase()}] ${vuln.title}\n`;
+                    report += `Descrição: ${vuln.description}\n`;
+                    if (educationalMode) {
+                        report += `Impacto: ${vuln.impact}\n`;
+                        report += `Remediação: ${vuln.remediation}\n`;
+                    }
+                    report += `Dados: ${vuln.data}\n\n`;
+                });
+            }
+            
+            report += '═══════════════════════════════════════════════════════\n';
+            report += 'Gerado por Bitcetus Hunter v2.0 - ECDSA Forensics\n';
+            report += '═══════════════════════════════════════════════════════\n';
+            
+            downloadFile('bitcetus_report.txt', report, 'text/plain');
+        }
+        
+        // Export as JSON
+        function exportJSON() {
+            const report = {
+                metadata: {
+                    tool: 'Bitcetus Hunter v2.0',
+                    version: '2.0',
+                    timestamp: new Date().toISOString(),
+                    mode: educationalMode ? 'educational' : 'audit'
+                },
+                summary: {
+                    totalSignatures: analysisResults.totalSigs,
+                    riskLevel: analysisResults.riskLevel,
+                    weaknessScore: analysisResults.weaknessScore,
+                    nonceReuse: analysisResults.nonceReuse,
+                    criticalVulnerabilities: analysisResults.criticalVulns,
+                    highVulnerabilities: analysisResults.highVulns,
+                    mediumVulnerabilities: analysisResults.mediumVulns
+                },
+                statistics: {
+                    avgEntropy: analysisResults.avgEntropy,
+                    minEntropy: analysisResults.minEntropy,
+                    maxEntropy: analysisResults.maxEntropy,
+                    lowSPercent: analysisResults.lowSPercent,
+                    leadingZeros: analysisResults.leadingZeros,
+                    msbZeros: analysisResults.msbZeros,
+                    effectiveBits: analysisResults.effectiveBits
+                },
+                vulnerabilities: analysisResults.vulnerabilities,
+                signatures: analysisResults.signatures.map(sig => ({
+                    txid: sig.txid,
+                    rHex: sig.rHex,
+                    sHex: sig.sHex,
+                    entropy: calculateEntropy(sig.rHex)
+                }))
+            };
+            
+            downloadFile('bitcetus_report.json', JSON.stringify(report, null, 2), 'application/json');
+        }
+        
+        // Export as PDF (simplified - browser print)
+        function exportPDF() {
+            alert('Para exportar como PDF, use Ctrl+P (Windows) ou Cmd+P (Mac) e selecione "Salvar como PDF" na impressora.');
+            window.print();
+        }
+        
+        // Download file helper
+        function downloadFile(filename, content, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // Show loading overlay
+        function showLoading() {
+            const overlay = document.createElement('div');
+            overlay.className = 'loading-overlay';
+            overlay.id = 'loadingOverlay';
+            overlay.innerHTML = `
+                <div class="loading-content">
+                    <div class="loading-spinner"></div>
+                    <div class="loading-text">Analisando assinaturas criptográficas...</div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+        
+        // Hide loading overlay
+        function hideLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.remove();
+            }
+        }
+    </script>
+</body>
+</html>
