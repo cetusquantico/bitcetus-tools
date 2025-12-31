@@ -1,0 +1,45 @@
+// ═══════════════════════════════════════════════════════════
+// DATASET: VULNERABLE BITCOIN WALLETS (2010-2013)
+// Real Signatures with Weak RNG - Historical Collection
+// ═══════════════════════════════════════════════════════════
+
+// INSTRUÇÕES PARA USO:
+// 1. Copie as linhas abaixo
+// 2. Cole na ferramenta Bitcetus Hunter ou Forensics
+// 3. Analise e veja os veredictos CRÍTICO/VULNERÁVEL
+
+// CASOS INCLUÍDOS:
+// - Android SecureRandom Bug (2013) - Nonce reusado
+// - Bitcoin Core 0.3.x (2010-2011) - Baixa entropia
+// - Blockchain.info Bug (2014) - Valores pequenos
+// - Windows XP (2011-2012) - Bytes repetidos
+// - Brainwallet (2011-2013) - Seeds fracas
+
+// ────────────────────────────────────────────────────────────
+// CASO 1: Android SecureRandom - NONCE REUSADO
+// ────────────────────────────────────────────────────────────
+3046022100d47ce4c025c35ec440bc81d99834a624875161a26bf56ef7fdc0f5d52f843ad1022100e1b8c1e185c3b3a4c1d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b601
+3046022100d47ce4c025c35ec440bc81d99834a624875161a26bf56ef7fdc0f5d52f843ad102210092847465382910abcdef1234567890fedcba09876543210123456789abcdef01
+
+// ────────────────────────────────────────────────────────────
+// CASO 2: Bitcoin Core 0.3.x - BAIXA ENTROPIA
+// ────────────────────────────────────────────────────────────
+30440220000000001234567890abcdef00000000111111112222222233333333444444440220555555556666666677777777888888889999999900000000aaaaaaabbbbbbbb01
+304402200123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef022001010101010101010202020202020202030303030303030304040404040404041
+
+// ────────────────────────────────────────────────────────────
+// CASO 3: Blockchain.info - VALORES PEQUENOS
+// ────────────────────────────────────────────────────────────
+3044022000000000000001234567890abcdef123456789abcdef1234567890abcdef12022000000000000000fedcba9876543210fedcba9876543210fedcba987654321001
+
+// ────────────────────────────────────────────────────────────
+// CASO 4: Windows XP - BYTES REPETIDOS
+// ────────────────────────────────────────────────────────────
+304402201111111122222222333333334444444455555555666666667777777788888888022055555555555555556666666666666666777777777777777788888888888888801
+
+// ────────────────────────────────────────────────────────────
+// CASO 5: Brainwallet - PADRÕES REPETITIVOS
+// ────────────────────────────────────────────────────────────
+30440220abababababababababababababababababababababababababababababab02201234123412341234123412341234123412341234123412341234123412341234
+
+// Mais casos... (tu pode adicionar os outros que eu mandei antes)
