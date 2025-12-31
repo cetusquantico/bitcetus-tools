@@ -31,7 +31,7 @@ Use responsibly. Never attempt to recover keys that do not belong to you.
 - **Visual Metrics** - Interactive charts and comparisons
 - **Educational Cases** - Android SecureRandom bug, Bitcoin Core 0.3.x, and more
 
-### 🎯 Puzzle #66 Entropy Analyzer
+### 🎯 Puzzle #135 Entropy Analyzer
 - **Florence Mode** - Specialized analysis for Bitcoin puzzles
 - **Range Detection** - Check if values fall in known ranges
 - **Pattern Recognition** - Detect repeating bytes and low entropy
@@ -72,7 +72,7 @@ cd bitcetus-tools
 - Compare implementation quality
 - Forensic investigation
 
-## 🎬 Demo Videos
+## 🎬
 
 *Coming soon: Video demonstrations of each tool*
 
