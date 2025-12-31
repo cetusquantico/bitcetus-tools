@@ -1,7 +1,15 @@
 # bitcetus-tools
 Bitcetus Tools — Educational Bitcoin Security Suite  Ferramentas open-source para análise forense de vulnerabilidades históricas do Bitcoin: • Nonce Reuse Attack (Android 2013) • Transaction Malleability • Weak RNG Comparison (2010 vs 2015+) • Private Key Recovery Demonstration  100% educacional · 100% offline · Pure JavaScript By Cetus 🐋 | 2025
 # 🐋 BITCETUS TOOLS
+## ⚠️ Important: Educational Purpose Only
 
+Bitcetus Tools demonstrates **historical vulnerabilities** that have been fixed in modern Bitcoin implementations.
+
+- No active attacks or brute force on current addresses
+- All examples use public, historical data (zero balance wallets)
+- Designed for learning ECDSA, RNG evolution, and Bitcoin security best practices
+
+Use responsibly. Never attempt to recover keys that do not belong to you.
 > Professional Bitcoin ECDSA Signature Forensics & Security Analysis Toolkit
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
