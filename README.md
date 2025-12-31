@@ -219,6 +219,30 @@ Se essas ferramentas te ajudaram a entender melhor a segurança do Bitcoin, insp
 
 Todo satoshi ajuda a continuar construindo ferramentas educacionais open-source para a comunidade Bitcoin.
 
-Obrigado por fazer parte dessa jornada! 🐋💜
+## 🛠️ Tools Included
+
+- **Bitcetus Hunter v2.0** — Advanced ECDSA Nonce Forensics
+- **ECDSA Signature Forensics v2.0** — Classic Dataset & Manual Analysis
+- **ECDSA Forensics v3.0** — Private Key Recovery (Hybrid Mode)
+- **Historical RNG Comparison** — 2010 Weak vs 2015+ Strong
+- **Bitcetus Recovery v1.0** — Standalone Nonce Reuse Attack Demo
+
+## ⚠️ Ethical Use Only
+
+These tools demonstrate **historical vulnerabilities** that have been fixed in modern Bitcoin.
+
+- All examples use public data from wallets with zero balance
+- No active attacks or brute force
+- For learning and research purposes only
+
+## 🐋 Support the Project
+
+If these tools helped you, consider a donation:
+
+**BTC:** `bc1qs4wajz6r5qg9429d8cjdxzedjyyzwuqz7fh55d`
+
+Thank you for supporting open-source Bitcoin education! 
+
+Obrigado por fazer parte dessa jornada! 🐋
 
 — Cetus | 2025–2026
