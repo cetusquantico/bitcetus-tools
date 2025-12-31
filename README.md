@@ -200,3 +200,17 @@ bitcetus-tools/
     ├── nonce-reuse-example.md
     ├── weak-rng-example.md
     └── recovery-walkthrough.md
+
+
+    ## 🐋 Support Bitcetus Development
+
+Se essas ferramentas te ajudaram a entender melhor a segurança do Bitcoin, inspiraram algum projeto ou simplesmente te fizeram dizer "caralho, que foda", considera apoiar o desenvolvimento futuro com uma doação voluntária.
+
+**Bitcoin (BTC):**  
+`bc1qs4wajz6r5qg9429d8cjdxzedjyyzwuqz7fh55d`
+
+Todo satoshi ajuda a continuar construindo ferramentas educacionais open-source para a comunidade Bitcoin.
+
+Obrigado por fazer parte dessa jornada! 🐋💜
+
+— Cetus | 2025–2026
